@@ -13,6 +13,7 @@ import sqlite3
 """
 The database schema used.
 """
+#TODO
 schema = {}
 
 """
@@ -41,6 +42,7 @@ class DatabaseManager(object):
     self._conn.close()
 
 
+# necessary?
 class DBException(Exception):
   #TODO
   pass
