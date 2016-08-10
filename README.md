@@ -26,10 +26,10 @@ Mostly as a reminder for myself how the system is set up.
 
 1. `git clone` the repo on to your device
 1. Run `sudo ???` to start the coffee measurement daemon
-1. Clone the repo or download the contents of the folder `webfront/` to your desired location on your webserver.
-1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `webfront/lib` or wherever you copied the contents of `webfront` to
+1. Clone the repo or download the contents of the folder `web/` to your desired location on your webserver.
+1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `web/lib/` or wherever you copied the contents of `web` to
 1. Set up the `config` file in said folder according to the instructions in `config.default`
-1. Expose the folder `front` on your webserver and you're good to go, assuming your firewall settings are correct.
+1. Expose the `web` folder on your server and you're good to go, assuming your firewall settings are correct.
 
 ### Running
 **TODO**
