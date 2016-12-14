@@ -2,22 +2,25 @@ $(function () {
 
 	//Mostly copied from http://www.highcharts.com/stock/demo/lazy-loading
 
+	//dummyData = [[0, 394], [1, 167], [2, 170], [3, 300], [4, 429]];
+
     function afterSetExtremes(e) {
 
-        var chart = $('#container').highcharts();
+        //var chart = $('#container').highcharts();
+		var chart = Highcharts.charts[0]; // ???
 
         chart.showLoading('Fetching data...');
 
-		// TODO
-    	//$.getJSON('http://kahviraspi/getdata?=' + Math.round(e.min) + '&end=' + Math.round(e.max) + '&callback=?', function (data) {
-    	//$.getJSON('http://kahvi.fyysikkokilta.fi/getdata.php?start=' + Math.round(e.min) + '&end=' + Math.round(e.max) + '&callback=?', function (data) { // callback needed?
-        $.getJSON('https://www.highcharts.com/samples/data/from-sql.php?start=' + Math.round(e.min) +
-                '&end=' + Math.round(e.max) + '&callback=?', function (data) {
+		dummyData = [[Date.UTC(2010, 9, 14, 19, 59), 394], [Date.UTC(2011, 9, 14, 19, 59), 164]]
+		data = dummyData;
 
-			//TODO: two series
-            chart.series[0].setData(data);
-            chart.hideLoading();
-        });
+		//TODO: two series
+        chart.series[0].setData(data);
+        chart.hideLoading();
+
+        chart.series[0].setData(dummyData);
+        chart.hideLoading();
+
     }
 
 
@@ -41,14 +44,18 @@ $(function () {
 			$table = 'stockquotes_month';
 		} 
 	 */
+
     $.getJSON('https://www.highcharts.com/samples/data/from-sql.php?callback=?', function (data) {
+			
+			//if (true) {
 
         // Add a null value for the end date
-        //data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null, null, null, null]]);
-
+        data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null, null, null, null]]);
+		//dummyData = [[Date.UTC(2010, 9, 14, 19, 59), 394], [Date.UTC(2011, 9, 14, 19, 59), 164]]
+		//data = dummyData;
         // Create the chart
-        $('#container').highcharts('StockChart', {
-
+        //$('#container').highcharts('StockChart', {
+        Highcharts.StockChart('container', {
 
             title: {
                 text: 'Kahvin määrä kiltiksellä ajan funktiona'
@@ -120,7 +127,7 @@ $(function () {
                 }
             }]
         });
-    });
+    }); //NOTE
 
 });
 
