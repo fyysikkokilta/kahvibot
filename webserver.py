@@ -18,11 +18,15 @@ dbm = db.DatabaseManager(config)
 
 @app.route("/data")
 def get_data():
+  print("getting data: {}".format(request))
   try:
     data_range = (request.args.get("s"), request.args.get("e"))
     query_result = dbm.query_range(data_range)
-    return(str(data_range))
+    #query_
+    #return str(data_range)
+    return str(query_result)
   except DBException:
+    print("DBEXCEPTION")
     #TODO
     raise
 

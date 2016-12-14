@@ -24,7 +24,8 @@ class DatabaseManager(object):
 
   def __init__(self, config):
     #TODO
-    db_path = config["paths"]["db_path"]
+    #db_path = config["paths"]["db_path"]
+    db_path = "test.db"
     self._conn = sqlite3.connect(db_path)
 
   def query_range(r):
@@ -37,6 +38,10 @@ class DatabaseManager(object):
     except (ValueError, TypeError) as e:
       #TODO: do this properly...
       raise DBException("Invalid database range: {}.".format(e))
+
+  def query_dummy(_):
+    import random
+    return random.sample(range(1024), 5)
 
   def close_connection(self):
     self._conn.close()
