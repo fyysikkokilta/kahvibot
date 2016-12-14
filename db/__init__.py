@@ -8,6 +8,7 @@ handles aggregation and querying the appropriate database if the request is a
 range.
 """
 import sqlite3
+import random
 
 
 """
@@ -24,11 +25,18 @@ class DatabaseManager(object):
 
   def __init__(self, config):
     #TODO
-    #db_path = config["paths"]["db_path"]
-    db_path = "test.db"
-    self._conn = sqlite3.connect(db_path)
+    
+    # override query function with dummy function
+    # this if-else is pretty stupid...
+    if config == "dummy":
+      self.query_range = self.query_dummy_range
+      self.query = self.query_dummy
 
-  def query_range(r):
+    else:
+      db_path = config["paths"]["db_path"]
+      self._conn = sqlite3.connect(db_path)
+
+  def query_range(self, r):
     try:
       (start, end) = r
       c = self._conn.cursor()
@@ -39,9 +47,13 @@ class DatabaseManager(object):
       #TODO: do this properly...
       raise DBException("Invalid database range: {}.".format(e))
 
-  def query_dummy(_):
-    import random
-    return random.sample(range(1024), 5)
+  def query_dummy_range(self, r):
+    max_num_points = 100
+    datapoints = random.sample(range(1024), min(max(r[1] - r[0], 0), 100))
+    return datapoints
+
+  def query_dummy(self):
+    return random.randint(0, 1024)
 
   def close_connection(self):
     self._conn.close()
