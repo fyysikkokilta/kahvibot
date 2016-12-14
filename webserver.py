@@ -14,20 +14,23 @@ import config
 
 app = Flask(__name__)
 
-dbm = db.DatabaseManager(config)
+cfg = config.get_config_dict()
+dbm = db.DatabaseManager(cfg)
 
 @app.route("/data")
 def get_data():
   print("getting data: {}".format(request))
   try:
-    data_range = (request.args.get("s"), request.args.get("e"))
-    query_result = dbm.query_range(data_range)
+    data_range = (int(request.args.get("s")), int(request.args.get("e")))
+    datapoints = dbm.query_range(data_range)
     #query_
     #return str(data_range)
-    return str(query_result)
-  except DBException:
-    print("DBEXCEPTION")
-    #TODO
+    #return str(query_result)
+    return json.dumps([[i, x] for i, x in enumerate(datapoints)])
+
+
+  #TODO
+  except db.DBException:
     raise
 
 def main():
