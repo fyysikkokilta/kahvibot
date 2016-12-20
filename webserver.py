@@ -7,8 +7,8 @@ manager, which then returns the appropriate data to be sent back as JSON.
 
 #TODO: turn this into a daemon
 
-from flask import Flask, request
-import json
+from flask import Flask, request, current_app, jsonify
+from functools import update_wrapper
 import db
 import config
 
@@ -17,7 +17,27 @@ app = Flask(__name__)
 cfg = config.get_config_dict()
 dbm = db.DatabaseManager(cfg)
 
-@app.route("/data")
+# Allow cross domain requests, see http://flask.pocoo.org/snippets/56/
+# Simplified version.
+#TODO: configure allowed origins etc. in this via config file...
+def crossdomain(origin = None):
+
+  if not isinstance(origin, str):
+    origin = ", ".join(origin)
+
+  def decorator(f):
+    def wrapped_function(*args, **kwargs):
+      #resp = make_response(f(*args, **kwargs))
+      resp = current_app.make_default_options_response()
+      h = resp.headers
+      h["Access-Control-Allow-Origin"] = origin
+      h["Access-Control-Allow-Methods"] = "GET" # TODO make this configurable
+      return resp
+    return update_wrapper(wrapped_function, f)
+  return decorator
+
+@app.route("/data", methods=["GET", "OPTIONS"])
+@crossdomain(origin="*")
 def get_data():
   print("getting data: {}".format(request))
   try:
@@ -26,7 +46,8 @@ def get_data():
     #query_
     #return str(data_range)
     #return str(query_result)
-    return json.dumps([[i, x] for i, x in enumerate(datapoints)])
+    #return json.dumps([[i, x] for i, x in enumerate(datapoints)])
+    return jsonify(items = [[i, x] for i, x in enumerate(datapoints)])
 
 
   #TODO
