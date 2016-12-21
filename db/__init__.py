@@ -33,8 +33,8 @@ class DatabaseManager(object):
       self.query = self.query_dummy
 
     else:
-      db_path = config["paths"]["db_path"]
-      self._conn = sqlite3.connect(db_path)
+      self.db_path = config["paths"]["db_path"]
+      self._conn = sqlite3.connect(self.db_path)
 
   def query_range(self, r):
     try:
@@ -58,9 +58,13 @@ class DatabaseManager(object):
   def query_dummy(self):
     return random.randint(0, 1024)
 
+  # initialize the database using self._conn
+  def initialize(self):
+    raise Exception("not implemented")
+
+
   def close_connection(self):
     self._conn.close()
-
 
 # necessary?
 class DBException(Exception):
@@ -80,6 +84,10 @@ if __name__ == "__main__":
       dest = "config_file",
       help = "use CONFIG_FILE as the configuration file instead of the default")
 
+  ap.add_argument("--initialize",
+      dest = "init",
+      help = "Initialize the database specified in the configuration according to the schema. Don't do anything if the database already exists.")
+
   #TODO: options for resetting, initializing etc.
 
   args = ap.parse_args()
@@ -87,6 +95,9 @@ if __name__ == "__main__":
   cfg = config.get_config_dict(args.config_file)
 
   dbm = DatabaseManager(cfg)
+
+  if args.init:
+    dbm.initialize()
 
   #TODO: tests...
   #dbm.query_range((0, 100))
