@@ -68,6 +68,10 @@ if __name__ == "__main__":
       dest="public", action = "store_true", 
       help = "make the flask app publicly visible to the network.")
 
+  ap.add_argument("--debug", 
+      dest="debug", action = "store_true", 
+      help = "enable flask debugging.")
+
 
   args = ap.parse_args()
 
@@ -75,6 +79,7 @@ if __name__ == "__main__":
   #TODO
   dbm = db.DatabaseManager("dummy")
   
+  app.debug = args.debug
 
   app.run('0.0.0.0' if args.public else None)
 
