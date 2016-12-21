@@ -49,7 +49,10 @@ class DatabaseManager(object):
 
   def query_dummy_range(self, r):
     max_num_points = 100
-    datapoints = random.sample(range(1024), min(max(r[1] - r[0], 0), 100))
+    lo, hi = r
+    num_points = min(max(hi - lo, 0), max_num_points)
+    y = random.sample(range(1024), num_points)
+    x = [lo + 1.0 * x * (hi - lo) / num_points for x in range(num_points)]
     return datapoints
 
   def query_dummy(self):
