@@ -56,14 +56,16 @@ $(function () {
     url = Config.url;
 
 
+    start = new Date(2016, 1, 1).getTime() // TODO: adjust this via config or query from server or something.
     end = new Date().getTime()
 
-    $.getJSON(url, {s: 0, e: end}, function (data) {
+    $.getJSON(url, {s: start, e: end}, function (data) {
 
 
         data = objToArray(data);
 
         //data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null]]);
+        data = [].concat(data, [[new Date().getTime(), null]]);
 
         // Create the chart
 
@@ -134,7 +136,7 @@ $(function () {
                 name: 'kahvi',
                 data: data,
                 tooltip: {
-                    valueDecimals: 2
+                  valueDecimals: 2 // TODO: change value to percentage or cups or sth and adjust accordingly
                 },
                 dataGrouping: {
                     enabled: false
