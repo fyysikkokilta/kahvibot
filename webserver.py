@@ -42,13 +42,12 @@ def crossdomain(origin = None):
 def get_data():
   #print("getting data: {}".format(request))
   try:
-    data_range = (int(request.args.get("s")), int(request.args.get("e")))
+
+    data_range = (int(float(request.args["s"])), int(float(request.args.get("e"))))
+
     datapoints = dbm.query_range(data_range)
-    #query_
-    #return str(data_range)
-    #return str(query_result)
-    #return json.dumps([[i, x] for i, x in enumerate(datapoints)])
-    return jsonify(data = [[i, x] for i, x in enumerate(datapoints)])
+
+    return jsonify([[i * 100 + data_range[0], x] for i, x in enumerate(datapoints)])
 
 
   #TODO
