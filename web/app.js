@@ -1,6 +1,8 @@
 $(function () {
 	//Mostly copied from http://www.highcharts.com/stock/demo/lazy-loading
 
+    // convert an object into an array, used for handling data
+    function objToArray(o) { return Object.keys(o).map(function(k) {return [parseInt(k), o[k]];}) }
 
     function afterSetExtremes(e) {
 
@@ -12,8 +14,9 @@ $(function () {
 
         url = Config.url;
 
-        console.log(e);
         $.getJSON(url, {s: e.min, e: e.max}, function(data) {
+
+          data = objToArray(data);
 
 		      //TODO: multiple series
           chart.series[0].setData(data);
@@ -53,15 +56,14 @@ $(function () {
     url = Config.url;
 
 
-    start = Date.UTC(2010, 9, 14, 19, 59);
+    end = new Date().getTime()
 
-    $.getJSON(url, {s: start, e: start + 50}, function (data) {
+    $.getJSON(url, {s: 0, e: end}, function (data) {
 
 
-        // convert the data (returned as an object) to an array
-        data = $.map(data, function(v, i) {return v;})
+        data = objToArray(data);
 
-        data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null, null, null, null]]);
+        //data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null]]);
 
         // Create the chart
 

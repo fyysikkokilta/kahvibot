@@ -52,8 +52,8 @@ class DatabaseManager(object):
     lo, hi = r
     num_points = min(max(hi - lo, 0), max_num_points)
     y = random.sample(range(1024), num_points)
-    x = [lo + 1.0 * x * (hi - lo) / num_points for x in range(num_points)]
-    return datapoints
+    x = [int(lo + 1.0 * x * (hi - lo) / num_points) for x in range(num_points)]
+    return zip(x, y)
 
   def query_dummy(self):
     return random.randint(0, 1024)

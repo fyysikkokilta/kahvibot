@@ -47,7 +47,8 @@ def get_data():
 
     datapoints = dbm.query_range(data_range)
 
-    return jsonify([[i * 100 + data_range[0], x] for i, x in enumerate(datapoints)])
+    #return jsonify([[i * 100 + data_range[0], x] for i, x in enumerate(datapoints)])
+    return jsonify(datapoints)
 
 
   #TODO
@@ -74,5 +75,6 @@ if __name__ == "__main__":
   #TODO
   dbm = db.DatabaseManager("dummy")
   
+
   app.run('0.0.0.0' if args.public else None)
 
