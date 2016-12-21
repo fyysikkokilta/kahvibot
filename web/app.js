@@ -1,48 +1,25 @@
 $(function () {
-  //source: https://www.html5rocks.com/en/tutorials/cors/
-  function createCORSRequest(method, url) {
-    var xhr = new XMLHttpRequest();
-    if ("withCredentials" in xhr) {
-  
-      // Check if the XMLHttpRequest object has a "withCredentials" property.
-      // "withCredentials" only exists on XMLHTTPRequest2 objects.
-      xhr.open(method, url, true);
-  
-    } else if (typeof XDomainRequest != "undefined") {
-  
-      // Otherwise, check if XDomainRequest.
-      // XDomainRequest only exists in IE, and is IE's way of making CORS requests.
-      xhr = new XDomainRequest();
-      xhr.open(method, url);
-  
-    } else {
-  
-      // Otherwise, CORS is not supported by the browser.
-      xhr = null;
-  
-    }
-    return xhr;
-  }
-
 	//Mostly copied from http://www.highcharts.com/stock/demo/lazy-loading
 
-	//dummyData = [[0, 394], [1, 167], [2, 170], [3, 300], [4, 429]];
 
     function afterSetExtremes(e) {
 
         //var chart = $('#container').highcharts();
-		var chart = Highcharts.charts[0]; // ???
+		    var chart = Highcharts.charts[0]; // ??? - vs. above
+
 
         chart.showLoading('Fetching data...');
 
-		dummyData = [[Date.UTC(2010, 9, 14, 19, 59), 394], [Date.UTC(2011, 9, 14, 19, 59), 164]]
-		data = dummyData;
+        url = Config.url;
 
-		//TODO: two series
-        chart.series[0].setData(data);
-        chart.hideLoading();
+        console.log(e);
+        $.getJSON(url, {s: e.min, e: e.max}, function(data) {
 
-        chart.series[0].setData(dummyData);
+		      //TODO: multiple series
+          chart.series[0].setData(data);
+        
+        });
+
         chart.hideLoading();
 
     }
@@ -69,16 +46,27 @@ $(function () {
 		} 
 	 */
 
-    $.getJSON('https://www.highcharts.com/samples/data/from-sql.php?callback=?', function (data) {
-			
-			//if (true) {
+    // url from original example
+    // url = "https://www.highcharts.com/samples/data/from-sql.php?callback=?"
 
-        // Add a null value for the end date
+    // get url from config file
+    url = Config.url;
+
+
+    start = Date.UTC(2010, 9, 14, 19, 59);
+
+    $.getJSON(url, {s: start, e: start + 50}, function (data) {
+
+
+        // convert the data (returned as an object) to an array
+        data = $.map(data, function(v, i) {return v;})
+
         data = [].concat(data, [[Date.UTC(2014, 9, 14, 19, 59), null, null, null, null]]);
-		//dummyData = [[Date.UTC(2010, 9, 14, 19, 59), 394], [Date.UTC(2011, 9, 14, 19, 59), 164]]
-		//data = dummyData;
+
         // Create the chart
+
         //$('#container').highcharts('StockChart', {
+
         Highcharts.StockChart('container', {
 
             title: {
