@@ -85,7 +85,7 @@ if __name__ == "__main__":
       help = "use CONFIG_FILE as the configuration file instead of the default")
 
   ap.add_argument("--initialize",
-      dest = "init",
+      dest = "init", action = "store_true",
       help = "Initialize the database specified in the configuration according to the schema. Don't do anything if the database already exists.")
 
   #TODO: options for resetting, initializing etc.
