@@ -28,7 +28,10 @@ SPICS = 25
 
 class Sensor():
   # set up SPI interface pins and read configuration
-  def __init__(self, config = None):
+  def __init__(self, config):
+
+    self.calibration = config["calibration"]
+
     GPIO.setup(SPIMOSI, GPIO.OUT)
     GPIO.setup(SPIMISO, GPIO.IN)
     GPIO.setup(SPICLK, GPIO.OUT)
@@ -99,8 +102,8 @@ class Sensor():
   """
   #TODO
   def poll(self, averaging_time = 10, avg_interval = 0.01):
-    #fun = self._read_adc
-    #fun = r
+    fun = self._read_adc
+    #fun = self._dummy_adc
     start = time.time()
     res = 0
     n = 0
