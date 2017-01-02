@@ -8,14 +8,17 @@ handles aggregation and querying the appropriate database if the request is a
 range.
 """
 import sqlite3
-import random
 
 
 """
 The database schema used.
 """
-#TODO
-schema = {}
+#TODO: add some way to identify calibration parameters
+#TODO: figure out if this should be defined in the configuration instead...
+TABLES = {
+    "data": [("timestamp", "integer primary key"), ("sensor_value", "integer"), ("calibrated_value", "real")],
+    "calibration_parameters": [("timestamp", "integer primary key"), ("values", "text")], #TODO: something like 'parameters_json' ?
+    }
 
 """
 A class to handle database queries. Opens a database connection upon creation,
@@ -48,6 +51,7 @@ class DatabaseManager(object):
       raise DBException("Invalid database range: {}.".format(e))
 
   def query_dummy_range(self, r):
+    import random
     max_num_points = 100
     lo, hi = r
     num_points = min(max(hi - lo, 0), max_num_points)
@@ -56,11 +60,40 @@ class DatabaseManager(object):
     return zip(x, y)
 
   def query_dummy(self):
+    import random
     return random.randint(0, 1024)
 
-  # initialize the database using self._conn
+  #TODO
+  # this function queries the latest calibration parameters from the appropriate table 
+  # should be used only on startup 
+  def query_latest_calibration(self):
+    # see https://stackoverflow.com/questions/22200587/get-records-for-the-latest-timestamp-in-sqlite
+    c = self._conn.cursor()
+    c.execute("SELECT * FROM ??? ORDER BY timestamp DESC LIMIT 1")
+    query_result = c.fetchall()
+    return query_result
+
+  # TODO
+  # store updated calibration settings in to the appropriate table
+  def update_calibration(self, timestamp, calibration_dict):
+    c = self._conn.cursor()
+    c.execute("INSERT (?, ?) INTO TABLE ... ??? ", timestamp, calibration_dict)
+    c.commit()
+
+
+  # initialize the tables to the database using self._conn
   def initialize(self):
-    raise Exception("not implemented")
+    import json
+    c = self._conn.cursor()
+    try:
+      #schema_string = "{}".format(", ".join(", ".join()))
+      c.execute("""CREATE TABLE ? (?)""", table, schema_string)
+    except sqlite3.OperationalError as e:
+      print("Abort: error when creating table {} in database {}: {}".format(t, self.db_path, e))
+      sefl._conn.rollback()
+      break
+
+    self._conn.commit()
 
 
   def close_connection(self):
@@ -106,4 +139,3 @@ if __name__ == "__main__":
 
 
   dbm.close_connection()
-
