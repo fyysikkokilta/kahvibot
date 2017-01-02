@@ -19,6 +19,11 @@ _CONFIG_DEFAULTS = {
           "db/test.db"),
       },
 
+      "calibration" : {
+        "sensor_min_value" : 0,
+        "sensor_max_value" : 1024,
+      },
+
     }
 
 """
