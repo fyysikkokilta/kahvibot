@@ -11,9 +11,28 @@ Mostly copied from https://gist.github.com/ladyada/3151375
 
 import time, os, sys
 import config
-#TODO: put this under a try-except and fall back to a dummy poll function if 
-# GPIO is not available
-import RPi.GPIO as GPIO
+
+# fall back to randomly generated sensor values if GPIO is not available
+try:
+  import RPi.GPIO as GPIO
+except ImportError:
+  #TODO: print -> log...
+  print("WARNING: no RPi module available, falling back to dummy GPIO")
+
+  import random
+
+  class GPIO_dummy():
+
+    # this is quite dirty
+    def input(self, foo):
+      return random.randint(0,1)
+
+    # override all other functions to return 0
+    def __getattr__(self, *a):
+      return lambda *x: 0
+
+
+  GPIO = GPIO_dummy()
 
 GPIO.setmode(GPIO.BCM)
 
@@ -28,9 +47,13 @@ SPICS = 25
 
 class Sensor():
   # set up SPI interface pins and read configuration
-  def __init__(self, config):
+  def __init__(self, cfg_dict = None):
 
-    self.calibration = config["calibration"]
+    if cfg_dict is None:
+      # use default configuration
+      cfg_dict = config.get_config_dict()
+
+    self.calibration = cfg_dict["calibration"]
 
     GPIO.setup(SPIMOSI, GPIO.OUT)
     GPIO.setup(SPIMISO, GPIO.IN)
