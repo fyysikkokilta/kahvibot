@@ -12,6 +12,7 @@ The first two of these are run on a Raspberry Pi, while the web software is host
 ## How?
 The telegram bot will most likely be based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) or possibly [telepot](https://github.com/nickoala/telepot).
 Data will be served in JSON by [Flask](http://flask.pocoo.org/) to a whitelisted server. The graphing will most likely be done using [Highstock](http://www.highcharts.com/products/highstock).
+The database is handled by MongoDB using [PyMongo](https://api.mongodb.com/python/current/).
 
 ## Why?
 Because.
