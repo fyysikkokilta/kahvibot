@@ -144,7 +144,9 @@ if __name__ == "__main__":
 
   fsr_adc = 0
 
-  s = Sensor()
+  cfg = config.get_config_dict()
+
+  s = Sensor(cfg)
 
   try:
 
