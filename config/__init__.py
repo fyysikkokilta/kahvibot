@@ -13,10 +13,25 @@ Default options
 #TODO: more default options...
 _CONFIG_DEFAULTS = {
       "paths": {
+        "root": os.getcwd(),
+
+        "stdin": "/dev/null",
+
+        "stdout": os.path.join(
+          os.path.dirname(os.path.dirname(__file__)),
+          "log/stdout.log"),
+
+        "stderr" : os.path.join(
+          os.path.dirname(os.path.dirname(__file__)),
+          "log/stderr.log"),
+
         # default database path is ../db/test.db relative to this file
         "db_path": os.path.join(
           os.path.dirname(os.path.dirname(__file__)),
           "db/test.db"),
+
+        "kahvid_pidfile": "/var/run/kahvid.pid",
+
       },
 
       "calibration" : {
@@ -42,7 +57,7 @@ def get_config_dict(filename = None):
   cp.read_dict(_CONFIG_DEFAULTS)
 
   #TODO: use logging instead of print...
-  print("Using configuration file " + filename)
+  #print("Using configuration file " + filename)
   cp.read(filename)
 
   return cp
