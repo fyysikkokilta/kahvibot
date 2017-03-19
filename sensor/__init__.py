@@ -36,12 +36,12 @@ except ImportError:
 
 GPIO.setmode(GPIO.BCM)
 
-# pin setup constants. see also: http://pinout.xyz
+# pin setup constants. BCM numbers. see also: http://pinout.xyz
 #TODO: should these be read from the config?
-SPICLK = 18
-SPIMISO = 23
-SPIMOSI = 24
-SPICS = 25
+SPICLK = 12
+SPIMISO = 5
+SPIMOSI = 6
+SPICS = 26
 #mcp = Adafruit_MCP3008.MCP3008(clk = SPICLK, cs = SPICS, miso = SPIMISO, mosi = SPIMOSI)
 
 
