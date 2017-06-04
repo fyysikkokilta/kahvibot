@@ -66,7 +66,7 @@ class Sensor():
     GPIO.output(clk, False)
   
   # read from  the ADC
-  def _read_adc(self, adc_num, 
+  def _read_adc(self, adc_num = 0, 
       clockpin = SPICLK, mosipin = SPIMOSI, misopin = SPIMISO, cspin = SPICS): 
   
     if (adc_num > 7) or (adc_num < 0):
@@ -136,7 +136,8 @@ class Sensor():
       time.sleep(avg_interval)
     #res = fun()
     res /= 1.0 * n
-    print("poll result: " + str(res) + " ({} averages)".format(n))
+    # TODO: compute standard deviation also.
+    print("poll result: {} ({} averages)".format(res, n))
     return res
 
 if __name__ == "__main__":
