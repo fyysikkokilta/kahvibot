@@ -26,6 +26,8 @@ class KahviDaemon(object):
     if config_dict is None:
       config_dict = config.get_config_dict()
 
+    self.config_dict = config_dict
+
     #db_path = config_dict["paths"]["db_path"]
     paths = config_dict["paths"]
 
@@ -59,7 +61,7 @@ class KahviDaemon(object):
     signal.signal(signal.SIGTERM, self.handle_sigterm)
     start_time = int(time.time())
 
-    sensor = sensorModule.Sensor()
+    sensor = sensorModule.Sensor(self.config_dict)
 
     # the time it took to start the measurement thread, to minimize clock error.
     delta_t = 0
