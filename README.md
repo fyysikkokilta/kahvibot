@@ -18,7 +18,7 @@ The database is handled by MongoDB using [PyMongo](https://api.mongodb.com/pytho
 Because.
 
 ## When?
-Soon(TM)
+Soon™
 
 ## Usage
 Mostly as a reminder for myself how the system is set up.
