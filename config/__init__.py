@@ -12,6 +12,9 @@ Default options
 """
 #TODO: more default options...
 _CONFIG_DEFAULTS = {
+      "general": {
+          "poll_interval": 10,
+        }
       "paths": {
         "root": os.getcwd(),
 
@@ -53,11 +56,11 @@ def get_config_dict(filename = None):
 
   cp = configparser.ConfigParser() #_CONFIG_DEFAULTS)
 
-  # read default values from dict
+  # read default values from dict if they are not given in the config file.
   cp.read_dict(_CONFIG_DEFAULTS)
 
   #TODO: use logging instead of print...
-  #print("Using configuration file " + filename)
+  print("Using configuration file " + filename)
   cp.read(filename)
 
   return cp
