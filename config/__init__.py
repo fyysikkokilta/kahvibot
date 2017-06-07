@@ -14,7 +14,8 @@ Default options
 _CONFIG_DEFAULTS = {
       "general": {
           "poll_interval": 10,
-        }
+      },
+
       "paths": {
         "root": os.getcwd(),
 
