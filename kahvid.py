@@ -17,6 +17,7 @@ import daemon
 import signal
 import os, time
 from daemon import pidfile
+#import logging, logging.handlers
 #from daemon import runner 
 
 # python daemon example from https://gist.github.com/javisantana/339430 
@@ -38,6 +39,7 @@ class KahviDaemon(object):
 
     #TODO: replace these with actual logging ...
     #NOTE: these redirect print() to these files ...
+    # see also: https://stackoverflow.com/questions/13180720/maintaining-logging-and-or-stdout-stderr-in-python-daemon
     self.stdin_path = paths["stdin"]
     self.stdout_path = paths["stdout"]
     self.stderr_path = paths["stderr"]
@@ -129,6 +131,16 @@ if __name__ == "__main__":
   ##    signal.SIGUSR2 : "terminate",
   ##    #signal.SIGUSR0 : "terminate",
   ##    }
+
+  # set up logging
+  #TODO
+  #TODO: formatting
+  #logger = logging.getLogger() #name = "???")
+  #logger.setLevel = logging.INFO # ???
+  #see e.g. https://stackoverflow.com/questions/3968669/how-to-configure-logging-to-syslog-in-python for explanation of /dev/log
+  #handler = logger.handlers.SysLogHandler(address = "/dev/log")  
+  #logger.addHandler(handler)
+
 
   from daemon.runner import DaemonRunner
   d = KahviDaemon()
