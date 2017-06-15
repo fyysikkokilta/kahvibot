@@ -4,7 +4,7 @@ including calibration parameters.
 """
 
 import configparser
-import os
+import os, syslog
 
 
 """
@@ -60,8 +60,7 @@ def get_config_dict(filename = None):
   # read default values from dict if they are not given in the config file.
   cp.read_dict(_CONFIG_DEFAULTS)
 
-  #TODO: use logging instead of print...
-  print("Using configuration file " + filename)
+  syslog.syslog(syslog.LOG_INFO, "config: Using configuration file " + filename)
   cp.read(filename)
 
   return cp
@@ -81,5 +80,3 @@ if __name__ == "__main__":
 
   cfg = get_config_dict(args.config_file)
   print(str(cfg))
-
-
