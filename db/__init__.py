@@ -7,7 +7,8 @@ corresponding to different amounts of aggregation. In this case the db manager
 handles aggregation and querying the appropriate database if the request is a
 range.
 """
-import sqlite3
+#import sqlite3
+from pymongo import MongoClient
 
 
 """
@@ -20,6 +21,7 @@ TABLES = {
     "calibration_parameters": [("timestamp", "integer primary key"), ("values", "text")], #TODO: something like 'parameters_json' ?
     }
 
+#TODO: does the connection need to be closd manually w/ mongodb?
 """
 A class to handle database queries. Opens a database connection upon creation,
 which needs to be closed manually.
@@ -36,9 +38,62 @@ class DatabaseManager(object):
       self.query = self.query_dummy
 
     else:
-      self.db_path = config["paths"]["db_path"]
-      self._conn = sqlite3.connect(self.db_path)
+      #TODO: remove this from configs, db location is determined by mongodb.conf ...
+      #self.db_path = config["paths"]["db_path"]
+      #self._conn = sqlite3.connect(self.db_path)
+      client = MongoClient()
+      # TODO: change this to an actual database
+      db = client["kahvidb-test"]
+      datacollection = db["test-data"]
+      
 
+      self.client = client
+      self.db = db
+      self.datacollection = datacollection
+      #TODO: a collection holding a single entry which is the latest calibration parameters
+      #self.calibrationParams = db["calibration-last"]
+      # this contains a history of calibration dictionaries.
+      #self.calibrationDicts = db["calibrationDicts"]
+
+  #############
+  # INSERTING #
+  #############
+
+  """
+  Insert a data point into the database.
+  """
+  #TODO: inserting multiple data points?
+  def insert_data(self, timestamp, raw_value, nCups):
+
+    # multiple datapoints #TODO
+    if hasattr(timestamp, "__iter__"):
+      #TODO
+      pass
+
+    # as of now, 
+    self.datacollection.insert_one(
+        {
+      "timestamp": 
+      }) 
+
+  #TODO: calibration parameters
+  #def update_calibration(self, calibrationDict):
+
+    #self.db["calibration-last"].update_one(
+    #  {"_id": 0},  # this ensures that calibrationParams will only have one value.
+    #  {"calibrationDict" : calibrationDict},
+    #  upsert = True
+    #)
+    #self.db["calibrationDicts"].insert_one({"timestamp" : time.time(), "calibrationDict": calibrationDict})
+
+
+  ############
+  # QUERYING #
+  ############
+
+  """
+  Query all datapoints within the given tuple range.
+  """
   def query_range(self, r):
     try:
       (start, end) = r
@@ -92,12 +147,6 @@ class DatabaseManager(object):
       print("Abort: error when creating table {} in database {}: {}".format(t, self.db_path, e))
       sefl._conn.rollback()
       break
-
-    self._conn.commit()
-
-
-  def close_connection(self):
-    self._conn.close()
 
 # necessary?
 class DBException(Exception):
