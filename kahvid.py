@@ -12,17 +12,22 @@ import config
 import sys
 import threading
 
-# TODO: see http://www.gavinj.net/2012/06/building-python-daemon-process.html
-import daemon
 import signal
 import os, time
-from daemon import pidfile
 #import logging, logging.handlers
 import syslog
-#from daemon import runner 
 
+#TODO: use systemd...
+"""
+for systemd stuff: 
+  see 
+    http://www.devdungeon.com/content/creating-systemd-service-files
+    /etc/systemd/kahvid.service
+    https://github.com/weewx/weewx/blob/f8b33ba9a7296f18de8b7fb31ede1f757a445f44/util/systemd/weewx.service
+    ....
+"""
 # python daemon example from https://gist.github.com/javisantana/339430 
-class KahviDaemon(object):
+class KahviDaemon(Daemon):
   def __init__(self, config_dict = None):
 
     if config_dict is None:
@@ -38,33 +43,18 @@ class KahviDaemon(object):
     self.run_dir = self.root
     self.working_directory = self.root
 
-    #TODO: replace these with actual logging ...
-    #NOTE: these redirect print() to these files ...
-    # see also: https://stackoverflow.com/questions/13180720/maintaining-logging-and-or-stdout-stderr-in-python-daemon
-
-    #TODO: figure out how to set these to None (without fiddling with the library...)
-    # - use a custom daemonContext instead of using the runner thing?
-    #   - how to pass paths then?
-    #   - also, how to catch signals?
-    #self.stdin_path = paths["stdin"]
-    #self.stdout_path = paths["stdout"]
-    #self.stderr_path = paths["stderr"]
-    self.stdin_path = ""
-    self.stdout_path = None
-    self.stderr_path = None
     self.pidfile_path = paths["kahvid_pidfile"]
-    self.pidfile_timeout = 1
+    #self.pidfile_timeout = 1
 
     self.poll_interval = int(config_dict["general"]["poll_interval"])
 
-
-  def handle_sigterm(self, *kwargs):
-    syslog.syslog(syslog.LOG_INFO, "Exiting.")
-    #print("caught sigterm: " + str(kwargs))
-    #TODO: close all files and disconnect db etc.
-    #os.kill(self.pidfile_path, signal.SIGTERM)
-    #raise Exception
-    sys.exit(0)
+  #def handle_sigterm(self, *kwargs):
+  #  syslog.syslog(syslog.LOG_INFO, "Exiting.")
+  #  #print("caught sigterm: " + str(kwargs))
+  #  #TODO: close all files and disconnect db etc.
+  #  #os.kill(self.pidfile_path, signal.SIGTERM)
+  #  #raise Exception
+  #  sys.exit(0)
 
   def run(self):
     # good idea to import here?
@@ -82,28 +72,29 @@ class KahviDaemon(object):
     # its value is set below.
     thread = None
 
-    with open("test.txt", "a") as f:
-      while True:
+    #with open("test.txt", "a") as f:
+    #print(f)
+    while True:
 
-        # if the previous measurement is in progress, skip a measurement
-        # shouldn't be a problem if self.poll_interval and averaging_time 
-        # aren't close to each other.
-        if thread is not None and thread.is_alive():
-          #print("WARNING: the sensor was still busy, skipping poll.")
-          syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
-          pass
-        else:
-          delta_t = -1 * time.time()
-          thread = threading.Thread(
-                target = self.write_record,
-                args = [sensor, f] # TODO: db instead of f
-              )
-          thread.start()
-          delta_t += time.time()
+      # if the previous measurement is in progress, skip a measurement
+      # shouldn't be a problem if self.poll_interval and averaging_time 
+      # aren't close to each other.
+      if thread is not None and thread.is_alive():
+        #print("WARNING: the sensor was still busy, skipping poll.")
+        syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
+        pass
+      else:
+        delta_t = -1 * time.time()
+        thread = threading.Thread(
+              target = self.write_record,
+              args = [sensor, open("test.txt", "a")] # TODO: db instead of f
+            )
+        thread.start()
+        delta_t += time.time()
 
-          #poll_result = sensor.poll(averaging_time = 1)
-          #f.write("{} {}\n".format(time.time(), poll_result))
-          time.sleep(self.poll_interval - delta_t)
+        #poll_result = sensor.poll(averaging_time = 1)
+        #f.write("{} {}\n".format(time.time(), poll_result))
+        time.sleep(self.poll_interval - delta_t)
 
 
   """
@@ -117,9 +108,9 @@ class KahviDaemon(object):
     #poll_result = sensor.poll(averaging_time = self.poll_interval)
     poll_result = sensor.poll(averaging_time = 1)
     t = time.time()
+    print(db_connection)
     #TODO: replace with actual db stuff...
     db_connection.write("{} {}\n".format(t, poll_result))
-
 
 
 #TODO: see example on how to start / stop the daemon using commands ...

@@ -19,16 +19,6 @@ _CONFIG_DEFAULTS = {
       "paths": {
         "root": os.getcwd(),
 
-        "stdin": "/dev/null",
-
-        "stdout": os.path.join(
-          os.path.dirname(os.path.dirname(__file__)),
-          "log/stdout.log"),
-
-        "stderr" : os.path.join(
-          os.path.dirname(os.path.dirname(__file__)),
-          "log/stderr.log"),
-
         # default database path is ../db/test.db relative to this file
         "db_path": os.path.join(
           os.path.dirname(os.path.dirname(__file__)),
