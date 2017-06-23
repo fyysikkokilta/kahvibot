@@ -4,7 +4,7 @@
 The main measurement program, responsible for polling the sensor periodically 
 and inserting the results into a database. 
 
-Must be run as root (to access the GPIO and to create a PID).
+Must be run as root (to access the GPIO and to create a PID file).
 """
 
 #import db, sensor, config
@@ -18,6 +18,7 @@ import signal
 import os, time
 from daemon import pidfile
 #import logging, logging.handlers
+import syslog
 #from daemon import runner 
 
 # python daemon example from https://gist.github.com/javisantana/339430 
@@ -40,9 +41,17 @@ class KahviDaemon(object):
     #TODO: replace these with actual logging ...
     #NOTE: these redirect print() to these files ...
     # see also: https://stackoverflow.com/questions/13180720/maintaining-logging-and-or-stdout-stderr-in-python-daemon
-    self.stdin_path = paths["stdin"]
-    self.stdout_path = paths["stdout"]
-    self.stderr_path = paths["stderr"]
+
+    #TODO: figure out how to set these to None (without fiddling with the library...)
+    # - use a custom daemonContext instead of using the runner thing?
+    #   - how to pass paths then?
+    #   - also, how to catch signals?
+    #self.stdin_path = paths["stdin"]
+    #self.stdout_path = paths["stdout"]
+    #self.stderr_path = paths["stderr"]
+    self.stdin_path = ""
+    self.stdout_path = None
+    self.stderr_path = None
     self.pidfile_path = paths["kahvid_pidfile"]
     self.pidfile_timeout = 1
 
@@ -50,7 +59,8 @@ class KahviDaemon(object):
 
 
   def handle_sigterm(self, *kwargs):
-    print("caught sigterm: " + str(kwargs))
+    syslog.syslog(syslog.LOG_INFO, "Exiting.")
+    #print("caught sigterm: " + str(kwargs))
     #TODO: close all files and disconnect db etc.
     #os.kill(self.pidfile_path, signal.SIGTERM)
     #raise Exception
@@ -79,7 +89,8 @@ class KahviDaemon(object):
         # shouldn't be a problem if self.poll_interval and averaging_time 
         # aren't close to each other.
         if thread is not None and thread.is_alive():
-          print("WARNING: the sensor was still busy, skipping poll.")
+          #print("WARNING: the sensor was still busy, skipping poll.")
+          syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
           pass
         else:
           delta_t = -1 * time.time()
@@ -147,5 +158,7 @@ if __name__ == "__main__":
 
   dr = DaemonRunner(d)
   dr.daemon_context.working_directory = "." #TODO
+  #dr.daemon_context.stdin = sys.stdin
+
   #TODO: figure out how to respond to result of do_action ...
   dr.do_action()
