@@ -56,6 +56,9 @@ class Sensor():
 
     self.averaging_time = cfg_dict["general"]["averaging_time"]
 
+    # this attribute can be used to check if the GPIO module is working
+    self.is_dummy = type(GPIO) == GPIO_dummy
+
     GPIO.setup(SPIMOSI, GPIO.OUT)
     GPIO.setup(SPIMISO, GPIO.IN)
     GPIO.setup(SPICLK, GPIO.OUT)
@@ -122,8 +125,9 @@ class Sensor():
   """
   The function that returns the sensor value after averaging,
   this is supposed to be called externally.
+  Returns: a dictionary containing the averaged raw sensor value and the no. of
+  cups we have determined to be in the coffee machine.
   """
-  #TODO
   def poll(self, averaging_time = None, avg_interval = 0.01):
     if not averaging_time:
       averaging_time = self.averaging_time
@@ -131,17 +135,33 @@ class Sensor():
     fun = self._read_adc
     #fun = self._dummy_adc
     start = time.time()
-    res = 0
+    raw_value = 0
     n = 0
     while time.time() - start < averaging_time:
-      res += fun()
+      raw_value += fun()
       n += 1
       time.sleep(avg_interval)
-    #res = fun()
-    res /= 1.0 * n
+
+    raw_value /= 1.0 * n
+
+    result = {}
+
+    result["rawValue"] = raw_value
+    result["nCups"] = compute_nCups(raw_value)
+
     # TODO: compute standard deviation also.
+    #result["std"] = ???
     #print("poll result: {} ({} averages)".format(res, n))
-    return res
+    return result
+
+  """
+  Compute the number of cups a given raw sensor value corresponds to, using the
+  calibration parameters.
+  """
+  def compute_nCups(self, raw_value):
+    #import warnings
+    #raise NotImplementedError("No. of cups computation not implemented yet.")
+    return raw_value / 1024. * 10
 
 if __name__ == "__main__":
   #tol = 3
