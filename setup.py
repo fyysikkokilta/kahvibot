@@ -7,7 +7,7 @@ from os import path
 import sys
 
 exec_path = path.join(path.dirname(path.abspath(__file__)), "kahvid")
-service_path = "/etc/systemd/system/kahvid.service"
+service_path = "/etc/systemd/system/kiltiskahvi.service"
 
 service_content = """# systemd configuration for kahvid
 [Unit]
