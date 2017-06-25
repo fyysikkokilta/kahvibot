@@ -60,11 +60,10 @@ def main(config_dict = None):
     syslog.syslog(syslog.LOG_INFO, "pwd: {}".format(os.getcwd()))
     while True:
 
-      # if the previous measurement is in progress, skip a measurement
-      # shouldn't be a problem if poll_interval and averaging_time 
-      # aren't close to each other.
+      # if the previous measurement is in progress, skip a measurement. 
+      # shouldn't be a problem if the difference between poll_interval and
+      # averaging_time is sufficiently large.
       if thread is not None and thread.is_alive():
-        #print("WARNING: the sensor was still busy, skipping poll.")
         syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
         pass
       else:
@@ -76,8 +75,6 @@ def main(config_dict = None):
         thread.start()
         delta_t += time.time()
 
-        #poll_result = sensor.poll(averaging_time = 1)
-        #f.write("{} {}\n".format(time.time(), poll_result))
         time.sleep(poll_interval - delta_t)
 
 
