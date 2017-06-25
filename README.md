@@ -29,7 +29,7 @@ Mostly as a reminder for myself how the system is set up.
 1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo`
 1. Run `sudo systemctl enable mongodb && sudo service mongodb start` to start the mongodb server and make it start on boot. Check `/etc/mongodb.conf` to make sure that mongodb is bound to localhost.
 1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
-1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon
+1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon. Check the syslog to see that it's working (or if it's not).
 1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
 1. Clone the repo or download the contents of the folder `web/` to your desired location on your webserver.
 1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `web/lib/` or wherever you copied the contents of `web` to
