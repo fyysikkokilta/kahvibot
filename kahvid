@@ -54,9 +54,6 @@ def main(config_dict = None):
   thread = None
 
 
-  # createa db manager instance
-  dbManager = db.DatabaseManager(config_dict)
-
   #TODO: wait so that measurements are always evenly spaced (assuming that poll_interval is the same)
   #time.sleep(time.time() % poll_interval)
 
@@ -73,7 +70,7 @@ def main(config_dict = None):
       delta_t = -1 * time.time()
       thread = threading.Thread(
             target = _write_record,
-            args = [sensor, dbManager] # TODO: how does this work with threading...
+            args = [sensor, config_dict] # TODO: how does this work with threading...
           )
       thread.start()
       delta_t += time.time()
@@ -87,11 +84,14 @@ exiting.
 """
 def handle_sigterm(*kwargs):
   #syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
-  syslog.syslog(syslog.LOG_INFO, "Exiting.")
+  syslog.syslog(syslog.LOG_INFO, "Waiting for measurements to finish...")
 
   for t in threading.enumerate():
-    if t != threading.main_thread():
+    if t != threading.main_thread() and not t.isDaemon():
       t.join()
+
+  syslog.syslog(syslog.LOG_INFO, "Exiting.")
+
 
   #TODO: close all files and disconnect db etc.
   #TODO: free up GPIO somehow...
@@ -106,24 +106,17 @@ thread so the timing of poll intervals doesn't get messed up.
 """
 # TODO: better name
 # TODO: change handling of db to an actual database connection instead of file...
-def write_record(sensor, dbManager):
-  data = sensor.poll()
+def write_record(sensor, config_dict):
 
-  # TODO: overwritten averaging_time is for testing only, remove that.
-  #poll_result = sensor.poll(averaging_time = 1)
+  # initialize db connections in this thread to avoid problems..
+  dbManager = db.DatabaseManager(config_dict)
+  data = sensor.poll()
 
   t = time.time()
 
   data["timestamp"] = t
 
-  #TODO: replace with actual db stuff...
-  #db_connection.write("{} {}\n".format(t, poll_result))
   dbManager.insert_data(data)
-
-  # TODO: this only applies to text files, remove...
-  # https://stackoverflow.com/questions/19756329/can-i-save-a-text-file-in-python-without-closing-it
-  #db_connection.flush(); os.fsync(db_connection)
-
 
 """
 A function that writes the data to a dummy output file instead, used for 
@@ -131,10 +124,10 @@ testing if GPIO is not available.
 """
 def write_record_dummy(sensor, *kwargs):
   import json
-
-  #raise Exception("foo")
   path = os.path
 
+  # initialize db connections in this thread to avoid problems..
+  dbManager = db.DatabaseManager(config_dict)
   data = sensor.poll()
 
   t = time.time()
