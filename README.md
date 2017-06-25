@@ -27,7 +27,7 @@ Mostly as a reminder for myself how the system is set up.
 
 1. `git clone` the repo on to your device
 1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo`
-1. Run `cd /path/to/kiltiskahvi/ && mongod --dbpath ./ --config mongodb.conf` to start the MongoDB server (it might be useful to add this to an init script). Note that MongoDB is started so that it doesn't accept external connections.
+1. Run `sudo systemctl enable mongodb && sudo service mongodb start` to start the mongodb server and make it start on boot. Check `/etc/mongodb.conf` to make sure that mongodb is bound to localhost.
 1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
 1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon
 1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
