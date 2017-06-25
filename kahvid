@@ -40,7 +40,13 @@ def main(config_dict = None):
   sensor = sensorPackage.Sensor(config_dict)
 
   poll_interval = int(config_dict["general"]["poll_interval"])
-  syslog.syslog(syslog.LOG_INFO, "Poll interval is {} seconds.".format(poll_interval))
+
+  syslog.syslog(
+      syslog.LOG_INFO, 
+      "Poll interval: {} s, averaging time: {} s.".format(
+        poll_interval, sensor.averaging_time
+        )
+      )
 
   # the time it took to start the measurement thread, used to minimize clock error.
   delta_t = 0
@@ -90,6 +96,8 @@ thread so the timing of poll intervals doesn't get messed up.
 # TODO: better name
 # TODO: change handling of db_connection to an actual database connection instead of file...
 def write_record(sensor, db_connection):
+  # TODO: overwritten averaging_time is for testing only, remove that.
+  #poll_result = sensor.poll()
   poll_result = sensor.poll(averaging_time = 1)
 
   t = time.time()

@@ -54,6 +54,8 @@ class Sensor():
 
     self.calibration = cfg_dict["calibration"]
 
+    self.averaging_time = cfg_dict["general"]["averaging_time"]
+
     GPIO.setup(SPIMOSI, GPIO.OUT)
     GPIO.setup(SPIMISO, GPIO.IN)
     GPIO.setup(SPICLK, GPIO.OUT)
@@ -122,7 +124,10 @@ class Sensor():
   this is supposed to be called externally.
   """
   #TODO
-  def poll(self, averaging_time = 10, avg_interval = 0.01):
+  def poll(self, averaging_time = None, avg_interval = 0.01):
+    if not averaging_time:
+      averaging_time = self.averaging_time
+
     fun = self._read_adc
     #fun = self._dummy_adc
     start = time.time()

@@ -14,6 +14,7 @@ Default options
 _CONFIG_DEFAULTS = {
       "general": {
           "poll_interval": 10,
+          "averaging_time": 9,
       },
 
       "paths": {
