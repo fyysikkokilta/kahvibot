@@ -18,6 +18,11 @@ import syslog
 
 import sensor as sensorPackage
 
+"""
+The main function, containing an infinite loop that polls the sensor 
+periodically as specified by poll_interval in the config and writes the results
+to a database.
+"""
 # TODO: see https://stackoverflow.com/questions/13069634/python-daemon-and-systemd-service
 def main(config_dict = None):
 
@@ -27,12 +32,7 @@ def main(config_dict = None):
   #db_path = config_dict["paths"]["db_path"]
   paths = config_dict["paths"]
 
-  #root = paths["root"]
-  #working_directory = root
-
-  #os.chdir(paths["root"])
-
-  pidfile_path = paths["kahvid_pidfile"]
+  os.chdir(paths["root"])
 
   # TODO: verify that this is the signal that systemd / kill sends
   signal.signal(signal.SIGTERM, handle_sigterm)
@@ -48,14 +48,16 @@ def main(config_dict = None):
         )
       )
 
-  # the time it took to start the measurement thread, used to minimize clock error.
+  # the time it took to start the measurement thread,
+  # used in an attempt to minimize clock error.
   delta_t = 0
 
   # the thread handling sensor polling and database writing.
-  # its value is set below.
+  # its value is set in the loop below.
   thread = None
 
   with open("test.txt", "a") as f:
+    syslog.syslog(syslog.LOG_INFO, "pwd: {}".format(os.getcwd()))
     while True:
 
       # if the previous measurement is in progress, skip a measurement
@@ -79,6 +81,10 @@ def main(config_dict = None):
         time.sleep(poll_interval - delta_t)
 
 
+"""
+Function that does everything necessary (closing db connections etc.) before 
+exiting.
+"""
 def handle_sigterm(*kwargs):
   syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
