@@ -1,10 +1,27 @@
 """
 This module handles inserting to and reading from a mongodb database.
 
-Possibly in the future, different collections (~tables, see mongodb reference) 
-may be used corresponding to different levels of aggregation. In this case the 
-db manager handles aggregation and querying the appropriate database if the 
-query is a range.
+For each measurement, we store the raw value of the sensor, a timestamp, the
+number of cups the sensor value corresponds to and possible additional
+information (standard deviation? something else?). The no. of cups as a
+function of raw sensor value may change depending on the sensor and calibration
+parameters. 
+
+The calibration parameters are stored separately, and a new entry is added only
+when the parameters change. This should make earlier raw sensor values
+compatible with newer measurements (in theory), as long as the method for
+calculating them is known. 
+A user need not worry about this, as the no. of cups is assumed to be correct
+for each calibration.
+
+Possibly in the future, different collections (~tables, see mongodb docs) may 
+be used corresponding to different levels of aggregation. In this case the db 
+manager handles aggregation and querying the appropriate database if the query 
+is a range.
+
+NOTE: The mongodb database is located in /var/lib/mongodb (default for debian
+(I think)). All db paths are handled automagically by mongodb, so we try not to
+fiddle with those at all.
 """
 from pymongo import MongoClient
 import sys
@@ -20,28 +37,35 @@ class DatabaseManager(object):
     #TODO
     
     # override query function with dummy function
-    # this if-else is pretty stupid...
+    # note: this if-else structure is pretty stupid...
     if config == "dummy":
       self.query_range = self.query_dummy_range
       self.query = self.query_dummy
 
     else:
-      #TODO: remove this from configs, db location is determined by mongodb.conf ...
-      #self.db_path = config["paths"]["db_path"]
-      #self._conn = sqlite3.connect(self.db_path)
-      client = MongoClient()
-      # TODO: change this to an actual database
-      db = client["kahvidb-test"]
-      datacollection = db["test-data"]
-      
+
+      client = MongoClient("localhost", 27017) # hard-coded local db.
+
+      # database and collection (~table) names are hardcoded... (good idea?)
+      db = client["kahvidb"]
+      datacollection = db["data"]
 
       self.client = client
       self.db = db
       self.datacollection = datacollection
-      #TODO: a collection holding a single entry which is the latest calibration parameters
+
+      """
+      A collection holding a single entry: the latest calibration parameters
+      in dictionary form. Another collection keeps track of the history of
+      calibration parameters. These are updated only when the calibration
+      values change.
+      """
+      #TODO: this whole thing
+      #TODO: check for changed parameters
       #self.calibrationParams = db["calibration-last"]
       # this contains a history of calibration dictionaries.
       #self.calibrationDicts = db["calibration-history"]
+
 
   #############
   # INSERTING #
@@ -49,20 +73,28 @@ class DatabaseManager(object):
 
   """
   Insert a data point into the database.
+  Perform simple verification that the given data dictionary contains some
+  required fields.
+
+  Might add support for inserting multiple data points in the future.
   """
   #TODO: inserting multiple data points?
-  def insert_data(self, timestamp, raw_value, nCups):
+  def insert_data(self, data_dict):
 
-    # multiple datapoints #TODO
-    if hasattr(timestamp, "__iter__"):
-      #TODO
-      pass
+    if type(data_dict) != dict:
+      raise NotImplementedError("Insert_data can only handle single data point dictionaries as of now.")
 
-    # as of now, 
-    #self.datacollection.insert_one(
-    #    {
-    #  "timestamp": 
-    #  }) 
+    # simple (and dirty) data validation, raises a KeyError if a required field is missing
+    # TODO: is there a better place for defining the required fields??
+    required_fields = ["timestamp", "rawValue", "nCups"]
+    [data_dict[field] for field in required_fields]
+
+    # handle multiple datapoints #TODO (this check isn't good if we're using a dict)
+    #if hasattr(timestamp, "__iter__"): 
+    #  #TODO
+    #  pass
+
+    self.datacollection.insert_one(data_dict)
 
   #TODO: calibration parameters
   #def update_calibration(self, calibrationDict):
@@ -213,7 +245,6 @@ def dump_database(dump_path, config_dict, purge = False):
 
 
 
-
 """
 Main function for testing and manual database management
 """
@@ -252,6 +283,7 @@ if __name__ == "__main__":
 
   args = ap.parse_args()
 
+  # TODO: is config even necessary for the DB manager?
   cfg = config.get_config_dict(args.config_file)
 
   if args.purge_dump_path:
@@ -271,6 +303,3 @@ if __name__ == "__main__":
   #dbm.query_range((0, 100))
   #dbm.query_range((50, 0)) # should raise an exception
   #...
-
-
-  dbm.close_connection()
