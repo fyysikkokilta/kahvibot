@@ -15,6 +15,8 @@ import db
 import config
 import sensor as sensorPackage
 
+MEASUREMENT_THREAD_NAME = "MeasurementThread"
+
 """
 The main function, containing an infinite loop that polls the sensor 
 periodically as specified by poll_interval in the config and writes the results
@@ -70,7 +72,8 @@ def main(config_dict = None):
       delta_t = -1 * time.time()
       thread = threading.Thread(
             target = _write_record,
-            args = [sensor, config_dict] # TODO: how does this work with threading...
+            args = [sensor, config_dict], # TODO: how does this work with threading...
+            name = MEASUREMENT_THREAD_NAME
           )
       thread.start()
       delta_t += time.time()
@@ -83,20 +86,18 @@ Function that does everything necessary (closing db connections etc.) before
 exiting.
 """
 def handle_sigterm(*kwargs):
-  #syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
-  syslog.syslog(syslog.LOG_INFO, "Waiting for measurements to finish...")
 
+  syslog.syslog(syslog.LOG_INFO, "Cleaning up GPIO...")
+  sensorPackage.GPIO.cleanup()
+
+  syslog.syslog(syslog.LOG_INFO, "Waiting for measurements to finish...")
+  # NOTE: assuming that there are no other non-daemon threads running...
   for t in threading.enumerate():
-    if t != threading.main_thread() and not t.isDaemon():
+    if t.name == MEASUREMENT_THREAD_NAME:
       t.join()
 
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
-
-  #TODO: close all files and disconnect db etc.
-  #TODO: free up GPIO somehow...
-  #os.kill(pidfile_path, signal.SIGTERM)
-  #raise Exception
   sys.exit(0)
 
 """
@@ -105,7 +106,6 @@ the given db_conection. The function is supposed to be called in its own
 thread so the timing of poll intervals doesn't get messed up.
 """
 # TODO: better name
-# TODO: change handling of db to an actual database connection instead of file...
 def write_record(sensor, config_dict):
 
   # initialize db connections in this thread to avoid problems..
