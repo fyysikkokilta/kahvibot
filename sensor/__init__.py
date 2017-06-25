@@ -57,7 +57,7 @@ class Sensor():
     self.averaging_time = float(cfg_dict["general"]["averaging_time"])
 
     # this attribute can be used to check if the GPIO module is working
-    self.is_dummy = type(GPIO) == GPIO_dummy
+    self.is_dummy = not GPIO.__name__ == "RPi.GPIO"
 
     GPIO.setup(SPIMOSI, GPIO.OUT)
     GPIO.setup(SPIMISO, GPIO.IN)
