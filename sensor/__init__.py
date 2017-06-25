@@ -9,15 +9,14 @@ Mostly copied from https://gist.github.com/ladyada/3151375
 
 
 
-import time, os, sys
+import time, os, sys, syslog
 import config
 
 # fall back to randomly generated sensor values if GPIO is not available
 try:
   import RPi.GPIO as GPIO
 except ImportError:
-  #TODO: print -> log...
-  print("WARNING: no RPi module available, falling back to dummy GPIO")
+  syslog.syslog(syslog.LOG_WARNING, "sensor: WARNING: no RPi module available, falling back to dummy GPIO")
 
   import random
 
@@ -81,7 +80,6 @@ class Sensor():
     command_out <<= 3
   
     for i in range(5):
-      #print(str(bin(command_out & 0x80)) + " " + str(bool(command_out & 0x80)))
       if(command_out & 0x80):
         GPIO.output(mosipin, True)
       else:
@@ -137,7 +135,7 @@ class Sensor():
     #res = fun()
     res /= 1.0 * n
     # TODO: compute standard deviation also.
-    print("poll result: {} ({} averages)".format(res, n))
+    #print("poll result: {} ({} averages)".format(res, n))
     return res
 
 if __name__ == "__main__":
