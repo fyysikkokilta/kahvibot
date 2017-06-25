@@ -4,7 +4,8 @@ including calibration parameters.
 """
 
 import configparser
-import os, syslog
+from os import path
+import syslog
 
 
 """
@@ -18,24 +19,12 @@ _CONFIG_DEFAULTS = {
       },
 
       "paths": {
-        "root": os.getcwd(),
-
-        "stdin": "/dev/null",
-
-        "stdout": os.path.join(
-          os.path.dirname(os.path.dirname(__file__)),
-          "log/stdout.log"),
-
-        "stderr" : os.path.join(
-          os.path.dirname(os.path.dirname(__file__)),
-          "log/stderr.log"),
+        "root": path.dirname(path.dirname(path.abspath(__file__))),
 
         # default database path is ../db/test.db relative to this file
-        "db_path": os.path.join(
-          os.path.dirname(os.path.dirname(__file__)),
+        "db_path": path.join(
+          path.dirname(path.dirname(__file__)),
           "db/test.db"),
-
-        "kahvid_pidfile": "/var/run/kahvid.pid",
 
       },
 
@@ -53,8 +42,8 @@ return it
 def get_config_dict(filename = None):
 
   if filename is None:
-    cfg_path = os.path.dirname(__file__)
-    filename = os.path.join(cfg_path, "config.ini")
+    cfg_path = path.dirname(__file__)
+    filename = path.join(cfg_path, "config.ini")
 
   cp = configparser.ConfigParser() #_CONFIG_DEFAULTS)
 
