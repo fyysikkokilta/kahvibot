@@ -132,6 +132,8 @@ def write_record_dummy(sensor, *kwargs):
 
   t = time.time()
 
+  data["timestamp"] = t
+
   target_dir = path.join(
         path.dirname(path.abspath(__file__)),
         "db",
