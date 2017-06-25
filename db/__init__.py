@@ -7,6 +7,8 @@ db manager handles aggregation and querying the appropriate database if the
 query is a range.
 """
 from pymongo import MongoClient
+import sys
+import os
 
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
@@ -39,7 +41,7 @@ class DatabaseManager(object):
       #TODO: a collection holding a single entry which is the latest calibration parameters
       #self.calibrationParams = db["calibration-last"]
       # this contains a history of calibration dictionaries.
-      #self.calibrationDicts = db["calibrationDicts"]
+      #self.calibrationDicts = db["calibration-history"]
 
   #############
   # INSERTING #
@@ -57,10 +59,10 @@ class DatabaseManager(object):
       pass
 
     # as of now, 
-    self.datacollection.insert_one(
-        {
-      "timestamp": 
-      }) 
+    #self.datacollection.insert_one(
+    #    {
+    #  "timestamp": 
+    #  }) 
 
   #TODO: calibration parameters
   #def update_calibration(self, calibrationDict):
@@ -127,22 +129,140 @@ class DBException(Exception):
   pass
 
 
-# for testing and manual database management
+"""
+Return a suitable folder name for dumping database contents by using a 
+timestamp. Don't create the folder, that must be done elsewhere.
+"""
+def get_default_dump_path():
+  import time
+  folderBaseName = os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), 
+      "dump",
+      "dump-" + time.strftime("%Y-%m-%d-%H%M", time.localtime())
+      )
 
+  folderName = folderBaseName
+
+  i = 1
+  while os.path.exists(folderName):
+    folderName = folderBaseName + "-" + str(i)
+    i += 1
+
+  return folderName
+
+"""
+Dump database contents using mongoexport, 
+"""
+def dump_database(dump_path, config_dict, purge = False):
+
+  dbm = DatabaseManager(config_dict)
+  db = dbm.db
+
+  # filter out system collections
+  collectionNames = list(filter(
+      lambda x: not x.startswith("system."),
+      db.collection_names()
+      ))
+  
+  # doing this check here prevents from creating folders if it's not necessary.
+  if not collectionNames:
+    print("Database {} appears to be empty. Exiting.".format(db.name))
+    sys.exit(0)
+
+
+  if not os.path.exists(dump_path):
+    # TODO: create folder as necessary
+    os.makedirs(dump_path)
+
+  else:
+
+    if not os.path.isdir(dump_path):
+      print("Error: {} is not a directory. Aborting.".format(dump_path))
+      sys.exit(1)
+
+    ans = input(
+        "WARNING: the folder {} already exists. Do you want to overwrite its contents? (y/n) ".format(dump_path)
+        ).lower()
+
+    if not ans in ["y", "yes"]:
+      print("Aborting.")
+      sys.exit(1)
+    
+
+  os.chdir(dump_path)
+
+  print("Dumping database content to {}.".format(os.getcwd()))
+
+  for collName in collectionNames:
+
+    fname = collName + ".json"
+
+    command = "mongoexport --db {} --collection {} --out {}".format(
+        db.name, collName, fname
+        )
+
+    print("executing {}".format(command))
+    retval = os.system(command)
+
+    if retval != 0:
+      raise Exception("Shell exited with error (return value {}).".format(retval))
+
+    if purge:
+      print("Dropping collection {}.".format(collName))
+      db.drop_collection(collName)
+
+
+
+
+"""
+Main function for testing and manual database management
+"""
 if __name__ == "__main__":
   import argparse
-  import config
 
-  ap = argparse.ArgumentParser()
+  try:
+    import config
+  except ImportError:
+    print("Could not import config, try adding the kiltiskahvi folder to your PYTHONPATH. Exiting.")
+    sys.exit(1)
+
+
+  ap = argparse.ArgumentParser(description = "Dump or delete database contents or run whatever is in the main function.")
+
   ap.add_argument("-c", "--config",
       dest = "config_file",
       help = "use CONFIG_FILE as the configuration file instead of the default")
 
-  #TODO: option to reset/dump database
+  ap.add_argument("--dump",
+      dest = "dump_path",
+      nargs = "?",
+      const = get_default_dump_path(),
+      default = None,
+      help = "Dump entire kiltiskahvi database contents in JSON format using mongoexport. Data is dumped to the specified folder or to kiltiskahvi/db/dump/ by default."
+      )
+
+  ap.add_argument("--purge",
+      dest = "purge_dump_path",
+      nargs = "?",
+      const = get_default_dump_path(),
+      default = None,
+      help = "Same as --dump but also delete database contents. Use at your own risk."
+      )
+
 
   args = ap.parse_args()
 
   cfg = config.get_config_dict(args.config_file)
+
+  if args.purge_dump_path:
+    dump_database(args.purge_dump_path, cfg, purge = True)
+    sys.exit(0)
+
+  elif args.dump_path:
+    dump_database(args.dump_path, cfg)
+    sys.exit(0)
+
+
 
   dbm = DatabaseManager(cfg)
 
