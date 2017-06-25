@@ -1,11 +1,10 @@
 """
-This module handles inserting to and reading from the database, the location of
-which is specified in the configuration. 
+This module handles inserting to and reading from a mongodb database.
 
-Possibly in the future, the database may be split into multiple parts each
-corresponding to different amounts of aggregation. In this case the db manager
-handles aggregation and querying the appropriate database if the request is a
-range.
+Possibly in the future, different collections (~tables, see mongodb reference) 
+may be used corresponding to different levels of aggregation. In this case the 
+db manager handles aggregation and querying the appropriate database if the 
+query is a range.
 """
 #import sqlite3
 from pymongo import MongoClient
