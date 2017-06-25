@@ -18,16 +18,6 @@ _CONFIG_DEFAULTS = {
           "averaging_time": 9,
       },
 
-      "paths": {
-        "root": path.dirname(path.dirname(path.abspath(__file__))),
-
-        # default database path is ../db/test.db relative to this file
-        "db_path": path.join(
-          path.dirname(path.dirname(__file__)),
-          "db/test.db"),
-
-      },
-
       "calibration" : {
         "sensor_min_value" : 0,
         "sensor_max_value" : 1024,
