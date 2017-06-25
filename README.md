@@ -28,7 +28,9 @@ Mostly as a reminder for myself how the system is set up.
 1. `git clone` the repo on to your device
 1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo`
 1. Run `cd /path/to/kiltiskahvi/ && mongod --dbpath ./ --config mongodb.conf` to start the MongoDB server (it might be useful to add this to an init script). Note that MongoDB is started so that it doesn't accept external connections.
-1. Run `sudo ???` to start the coffee measurement daemon
+1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
+1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon
+1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
 1. Clone the repo or download the contents of the folder `web/` to your desired location on your webserver.
 1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `web/lib/` or wherever you copied the contents of `web` to
 1. Set up the `config` file in said folder according to the instructions in `config.default`
