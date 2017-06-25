@@ -151,7 +151,7 @@ def get_default_dump_path():
   return folderName
 
 """
-Dump database contents using mongoexport, 
+Dump database contents using mongoexport and drop collections if specified. 
 """
 def dump_database(dump_path, config_dict, purge = False):
 
