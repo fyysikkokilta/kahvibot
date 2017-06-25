@@ -88,3 +88,7 @@ ENV/
 
 # vim files
 *.swp
+
+# database dumps and dummy files
+db/dummy/
+db/dump/
