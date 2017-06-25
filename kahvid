@@ -41,16 +41,18 @@ def main(config_dict = None):
 
   #TODO: make this in a more sensible manner
   if sensor.is_dummy:
-    write_record = write_record_dummy
+    _write_record = write_record_dummy
     #raise NotImplementedError("Database handling of dummy sensor is not yet implemented...")
+  else:
+    _write_record = write_record
 
   # the time it took to start the measurement thread,
   # used in an attempt to minimize clock error.
   delta_t = 0
 
-  # the thread handling sensor polling and database writing.
-  # its value is set in the loop below.
+  # The thread handling sensor polling and database writing.
   thread = None
+
 
   # createa db manager instance
   dbManager = db.DatabaseManager(config_dict)
@@ -70,7 +72,7 @@ def main(config_dict = None):
     else:
       delta_t = -1 * time.time()
       thread = threading.Thread(
-            target = write_record,
+            target = _write_record,
             args = [sensor, dbManager] # TODO: how does this work with threading...
           )
       thread.start()
@@ -87,7 +89,12 @@ def handle_sigterm(*kwargs):
   #syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
+  for t in threading.enumerate():
+    if t != threading.main_thread():
+      t.join()
+
   #TODO: close all files and disconnect db etc.
+  #TODO: free up GPIO somehow...
   #os.kill(pidfile_path, signal.SIGTERM)
   #raise Exception
   sys.exit(0)
