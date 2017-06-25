@@ -31,7 +31,7 @@ def main(config_dict = None):
 
   # set up sensor and poll intervals
   sensor = sensorPackage.Sensor(config_dict)
-  poll_interval = int(config_dict["general"]["poll_interval"])
+  poll_interval = float(config_dict["general"]["poll_interval"])
   syslog.syslog(
       syslog.LOG_INFO, 
       "Poll interval: {} s, averaging time: {} s.".format(
