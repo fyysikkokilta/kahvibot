@@ -7,15 +7,12 @@ and inserting the results into a database.
 Must be run as root (to access the GPIO and to create a PID file).
 """
 
-#import db, sensor, config
-import config
-import sys
-import threading
-
-import signal
-import os, time
+import sys, os, time
 import syslog
-
+import threading
+import signal
+import db
+import config
 import sensor as sensorPackage
 
 """
@@ -29,24 +26,23 @@ def main(config_dict = None):
   if config_dict is None:
     config_dict = config.get_config_dict()
 
-  #db_path = config_dict["paths"]["db_path"]
-  paths = config_dict["paths"]
-
-  os.chdir(paths["root"])
-
-  # TODO: verify that this is the signal that systemd / kill sends
+  # bind handling of SIGTERM to the appropriate function.
   signal.signal(signal.SIGTERM, handle_sigterm)
 
+  # set up sensor and poll intervals
   sensor = sensorPackage.Sensor(config_dict)
-
   poll_interval = int(config_dict["general"]["poll_interval"])
-
   syslog.syslog(
       syslog.LOG_INFO, 
       "Poll interval: {} s, averaging time: {} s.".format(
         poll_interval, sensor.averaging_time
         )
       )
+
+  #TODO: make this in a more sensible manner
+  if sensor.is_dummy:
+    write_record = write_record_dummy
+    #raise NotImplementedError("Database handling of dummy sensor is not yet implemented...")
 
   # the time it took to start the measurement thread,
   # used in an attempt to minimize clock error.
@@ -56,26 +52,31 @@ def main(config_dict = None):
   # its value is set in the loop below.
   thread = None
 
-  with open("test.txt", "a") as f:
-    syslog.syslog(syslog.LOG_INFO, "pwd: {}".format(os.getcwd()))
-    while True:
+  # createa db manager instance
+  dbManager = db.DatabaseManager(config_dict)
 
-      # if the previous measurement is in progress, skip a measurement. 
-      # shouldn't be a problem if the difference between poll_interval and
-      # averaging_time is sufficiently large.
-      if thread is not None and thread.is_alive():
-        syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
-        pass
-      else:
-        delta_t = -1 * time.time()
-        thread = threading.Thread(
-              target = write_record,
-              args = [sensor, f] # TODO: db instead of f
-            )
-        thread.start()
-        delta_t += time.time()
+  #TODO: wait so that measurements are always evenly spaced (assuming that poll_interval is the same)
+  #time.sleep(time.time() % poll_interval)
 
-        time.sleep(poll_interval - delta_t)
+  while True:
+
+    # if the previous measurement is in progress, skip a measurement. 
+    # shouldn't be a problem if the difference between poll_interval and
+    # averaging_time is sufficiently large.
+    if thread is not None and thread.is_alive():
+      syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
+      delta_t = 0.
+
+    else:
+      delta_t = -1 * time.time()
+      thread = threading.Thread(
+            target = write_record,
+            args = [sensor, dbManager] # TODO: how does this work with threading...
+          )
+      thread.start()
+      delta_t += time.time()
+
+    time.sleep(poll_interval - delta_t)
 
 
 """
@@ -83,7 +84,7 @@ Function that does everything necessary (closing db connections etc.) before
 exiting.
 """
 def handle_sigterm(*kwargs):
-  syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
+  #syslog.syslog(syslog.LOG_INFO, "caught sigterm: " + str(kwargs))
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
   #TODO: close all files and disconnect db etc.
@@ -97,20 +98,56 @@ the given db_conection. The function is supposed to be called in its own
 thread so the timing of poll intervals doesn't get messed up.
 """
 # TODO: better name
-# TODO: change handling of db_connection to an actual database connection instead of file...
-def write_record(sensor, db_connection):
+# TODO: change handling of db to an actual database connection instead of file...
+def write_record(sensor, dbManager):
+  data = sensor.poll()
+
   # TODO: overwritten averaging_time is for testing only, remove that.
-  #poll_result = sensor.poll()
-  poll_result = sensor.poll(averaging_time = 1)
+  #poll_result = sensor.poll(averaging_time = 1)
 
   t = time.time()
 
+  data["timestamp"] = t
+
   #TODO: replace with actual db stuff...
-  db_connection.write("{} {}\n".format(t, poll_result))
+  #db_connection.write("{} {}\n".format(t, poll_result))
+  dbManager.insert_data(data)
 
   # TODO: this only applies to text files, remove...
   # https://stackoverflow.com/questions/19756329/can-i-save-a-text-file-in-python-without-closing-it
-  db_connection.flush(); os.fsync(db_connection)
+  #db_connection.flush(); os.fsync(db_connection)
+
+
+"""
+A function that writes the data to a dummy output file instead, used for 
+testing if GPIO is not available.
+"""
+def write_record_dummy(sensor, *kwargs):
+  import json
+
+  #raise Exception("foo")
+  path = os.path
+
+  data = sensor.poll()
+
+  t = time.time()
+
+  target_dir = path.join(
+        path.dirname(path.abspath(__file__)),
+        "db",
+        "dummy",
+        )
+
+  if not path.exists(target_dir):
+    syslog.syslog(syslog.LOG_WARNING, "Creating folder {} for dummy database output.".format(target_dir))
+    os.makedirs(target_dir)
+
+  os.chdir(target_dir)
+
+  # NOTE: this assumes that the file isn't open by someone else...
+  with open("dummy.txt", "a") as f:
+    f.write(json.dumps(data) + "\n")
+
 
 
 if __name__ == "__main__":
