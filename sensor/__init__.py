@@ -54,7 +54,7 @@ class Sensor():
 
     self.calibration = cfg_dict["calibration"]
 
-    self.averaging_time = cfg_dict["general"]["averaging_time"]
+    self.averaging_time = float(cfg_dict["general"]["averaging_time"])
 
     # this attribute can be used to check if the GPIO module is working
     self.is_dummy = type(GPIO) == GPIO_dummy
@@ -147,7 +147,7 @@ class Sensor():
     result = {}
 
     result["rawValue"] = raw_value
-    result["nCups"] = compute_nCups(raw_value)
+    result["nCups"] = self.compute_nCups(raw_value)
 
     # TODO: compute standard deviation also.
     #result["std"] = ???
