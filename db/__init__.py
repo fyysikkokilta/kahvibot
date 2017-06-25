@@ -26,6 +26,7 @@ fiddle with those at all.
 from pymongo import MongoClient
 import sys
 import os
+import syslog
 
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
@@ -33,14 +34,18 @@ A class to handle database queries.
 """
 class DatabaseManager(object):
 
-  def __init__(self, config):
+  def __init__(self, config_dict, dummy = False):
     #TODO
     
     # override query function with dummy function
     # note: this if-else structure is pretty stupid...
-    if config == "dummy":
+    if dummy:
       self.query_range = self.query_dummy_range
       self.query = self.query_dummy
+      syslog.syslog(
+          syslog.LOG_WARNING, 
+          "db: Overwriting query functions with dummy ones."
+      )
 
     else:
 
@@ -250,19 +255,18 @@ Main function for testing and manual database management
 """
 if __name__ == "__main__":
   import argparse
-
   try:
     import config
   except ImportError:
     print("Could not import config, try adding the kiltiskahvi folder to your PYTHONPATH. Exiting.")
     sys.exit(1)
 
-
   ap = argparse.ArgumentParser(description = "Dump or delete database contents or run whatever is in the main function.")
 
   ap.add_argument("-c", "--config",
       dest = "config_file",
-      help = "use CONFIG_FILE as the configuration file instead of the default")
+      help = "Use CONFIG_FILE as the configuration file instead of the default."
+      )
 
   ap.add_argument("--dump",
       dest = "dump_path",
@@ -283,7 +287,7 @@ if __name__ == "__main__":
 
   args = ap.parse_args()
 
-  # TODO: is config even necessary for the DB manager?
+  # TODO: is config even necessary for the DB manager? -- yes, for checking changes in the calibration (might not be the smartest way to do it though.
   cfg = config.get_config_dict(args.config_file)
 
   if args.purge_dump_path:
