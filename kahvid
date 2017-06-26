@@ -9,20 +9,16 @@ Must be run as root (to access the GPIO and to create a PID file).
 
 import sys, os, time
 import syslog
-import threading
 import signal
 import db
 import config
 import sensor as sensorPackage
-
-MEASUREMENT_THREAD_NAME = "MeasurementThread"
 
 """
 The main function, containing an infinite loop that polls the sensor 
 periodically as specified by poll_interval in the config and writes the results
 to a database.
 """
-# TODO: see https://stackoverflow.com/questions/13069634/python-daemon-and-systemd-service
 def main(config_dict = None):
 
   if config_dict is None:
@@ -31,7 +27,7 @@ def main(config_dict = None):
   # bind handling of SIGTERM to the appropriate function.
   signal.signal(signal.SIGTERM, handle_sigterm)
 
-  # set up sensor and poll intervals
+  # set up sensor instance and poll intervals
   sensor = sensorPackage.Sensor(config_dict)
   poll_interval = float(config_dict["general"]["poll_interval"])
   syslog.syslog(
@@ -41,44 +37,33 @@ def main(config_dict = None):
         )
       )
 
-  #TODO: make this in a more sensible manner
-  if sensor.is_dummy:
-    _write_record = write_record_dummy
-    #raise NotImplementedError("Database handling of dummy sensor is not yet implemented...")
-  else:
-    _write_record = write_record
+  # create a db manager instance
+  dbManager = db.DatabaseManager(config_dict)
 
-  # the time it took to start the measurement thread,
-  # used in an attempt to minimize clock error.
-  delta_t = 0
+  syslog.syslog(syslog.LOG_INFO, "Starting measurements.")
 
-  # The thread handling sensor polling and database writing.
-  thread = None
-
-
-  #TODO: wait so that measurements are always evenly spaced (assuming that poll_interval is the same)
-  #time.sleep(time.time() % poll_interval)
+  # wait until the clock is even (with regard to the poll interval)
+  time.sleep(poll_interval - (time.time() % poll_interval))
 
   while True:
 
-    # if the previous measurement is in progress, skip a measurement. 
-    # shouldn't be a problem if the difference between poll_interval and
-    # averaging_time is sufficiently large.
-    if thread is not None and thread.is_alive():
-      syslog.syslog(syslog.LOG_WARNING, "Sensor was busy, skipping poll.")
-      delta_t = 0.
+    t = time.time()
 
+    data = sensor.poll()
+
+    data["timestamp"] = time.time() #TODO: this or starting time?
+
+    if sensor.is_dummy:
+      write_dummy(data)
     else:
-      delta_t = -1 * time.time()
-      thread = threading.Thread(
-            target = _write_record,
-            args = [sensor, config_dict], # TODO: how does this work with threading...
-            name = MEASUREMENT_THREAD_NAME
-          )
-      thread.start()
-      delta_t += time.time()
+      dbManager.insert_data(data)
 
-    time.sleep(poll_interval - delta_t)
+    # if polling took longer than expected (for whatever reason), warn.
+    if t - time.time() > poll_interval:
+      syslog.syslog(syslog.LOG_WARNING, "WARNING: poll took longer than poll_interval.")
+
+    # wait for the next cycle.
+    time.sleep(poll_interval - (time.time() % poll_interval))
 
 
 """
@@ -90,49 +75,18 @@ def handle_sigterm(*kwargs):
   syslog.syslog(syslog.LOG_INFO, "Cleaning up GPIO...")
   sensorPackage.GPIO.cleanup()
 
-  syslog.syslog(syslog.LOG_INFO, "Waiting for measurements to finish...")
-  # NOTE: assuming that there are no other non-daemon threads running...
-  for t in threading.enumerate():
-    if t.name == MEASUREMENT_THREAD_NAME:
-      t.join()
-
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
   sys.exit(0)
 
-"""
-This function polls the sensor and writes the result to the database using 
-the given db_conection. The function is supposed to be called in its own 
-thread so the timing of poll intervals doesn't get messed up.
-"""
-# TODO: better name
-def write_record(sensor, config_dict):
-
-  # initialize db connections in this thread to avoid problems..
-  dbManager = db.DatabaseManager(config_dict)
-  data = sensor.poll()
-
-  t = time.time()
-
-  data["timestamp"] = t
-
-  dbManager.insert_data(data)
 
 """
-A function that writes the data to a dummy output file instead, used for 
-testing if GPIO is not available.
+A function that writes the data to a dummy output file instead, used only in 
+testing, when the GPIO is not available.
 """
-def write_record_dummy(sensor, *kwargs):
+def write_dummy(data):
   import json
   path = os.path
-
-  # initialize db connections in this thread to avoid problems..
-  dbManager = db.DatabaseManager(config_dict)
-  data = sensor.poll()
-
-  t = time.time()
-
-  data["timestamp"] = t
 
   target_dir = path.join(
         path.dirname(path.abspath(__file__)),
@@ -146,10 +100,9 @@ def write_record_dummy(sensor, *kwargs):
 
   os.chdir(target_dir)
 
-  # NOTE: this assumes that the file isn't open by someone else...
+  # NOTE: this assumes that the file isn't open by someone else (i think)...
   with open("dummy.txt", "a") as f:
     f.write(json.dumps(data) + "\n")
-
 
 
 if __name__ == "__main__":
