@@ -10,7 +10,11 @@ Mostly copied from https://gist.github.com/ladyada/3151375
 
 
 import time, os, sys, syslog
-import config
+try:
+  import config
+except ImportError:
+  print("Could not import config, try adding the kiltiskahvi folder to your PYTHONPATH. Exiting.")
+  sys.exit(1)
 
 # fall back to randomly generated sensor values if GPIO is not available
 try:
@@ -164,9 +168,6 @@ class Sensor():
     return raw_value / 1024. * 10
 
 if __name__ == "__main__":
-  #tol = 3
-
-  fsr_adc = 0
 
   cfg = config.get_config_dict()
 
@@ -174,24 +175,23 @@ if __name__ == "__main__":
 
   try:
 
-    x = 0
+    # threshold value for debouncing
     epsilon = 2
-    prev_value = 0
+
+    nCups = 0.
+    rawValue = 0
 
     while True:
-      adc_out = s._read_adc(fsr_adc) #, SIPCLK, SPIMOSI, SPIMISO, SPICS)
-      curr_value = prev_value if abs(prev_value - adc_out) < epsilon else adc_out
-      #adc_out = mcp.read_adc(1)
-      if False:
-        fmt = "{:010b}"
-      else:
-        fmt = "{:0>4}"
-      #sys.stdout.write((" " if x % 2 else "x") + fmt.format(adc_out) + "\r")
-      sys.stdout.write(fmt.format(curr_value) + "\r")
-      #sys.stdout.write((" " if x % 2 else "x") + "{:0>5}x".format(adc_out) + "\r")
-      #sys.stdout.write("{:0>4}\n".format(adc_out))
+      res = s.poll(averaging_time = 0.01, avg_interval = 0.001)
+      rawValue_new = int(res["rawValue"])
+      nCups_new = res["nCups"]
+      if abs(rawValue_new - rawValue) > epsilon:
+        rawValue = rawValue_new
+        nCups = nCups_new
+
+      fmt = "{:0>4} {:>7.1f} {:>12.1f}"
+      sys.stdout.write(fmt.format(rawValue, nCups, time.time()) + "\r")
       sys.stdout.flush()
-      x += 1
       time.sleep(0.05)
 
   except KeyboardInterrupt:
