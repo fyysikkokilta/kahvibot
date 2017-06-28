@@ -27,6 +27,7 @@ from pymongo import MongoClient
 import sys
 import os
 import syslog
+import re
 
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
@@ -52,7 +53,10 @@ class DatabaseManager(object):
       client = MongoClient("localhost", 27017) # hard-coded local db.
 
       # database and collection (~table) names are hardcoded... (good idea?)
-      db = client["kahvidb"]
+      #db = client["kahvidb"]
+      db = client["testdb"] #TODO
+      syslog.syslog(syslog.LOG_WARNING, "db: warning: using test database 'testdb'.")
+
       datacollection = db["data"]
 
       self.client = client
@@ -70,6 +74,39 @@ class DatabaseManager(object):
       #self.calibrationParams = db["calibration-last"]
       # this contains a history of calibration dictionaries.
       #self.calibrationDicts = db["calibration-history"]
+
+      """
+      Read the compute_nCups function from the appropriate file and store it in
+      the database (if necessary).
+      """
+      #TODO
+      p = os.path
+      nCups_function_filename = p.join(
+        p.dirname(p.dirname(p.abspath(__file__))),
+        "sensor",
+        "compute_nCups.py"
+        )
+      nCups_function_string = None
+      with open(nCups_function_filename, "r") as f:
+        nCups_function_string = f.read()
+
+      # remove description from the beginning of the string
+      nCups_function_string = re.sub(
+          r'""".+?"""\n?', #replace this pattern (a text block)...
+          "", # ... with empty
+          nCups_function_string, # in this str
+          count = 1, # replace only first occurrence.
+          flags = re.DOTALL # this makes '.' match newline as well
+          )
+
+      if db["nCups-function-last"].find_one({"_id": 0}) != nCups_function_string:
+        db["nCups-function-history"].insert_one(nCups_function_string)
+        db["nCups-function-last"].insert_one(
+            {"_id" : 0,  "str" : nCups_function_string},
+            upsert = True
+            )
+
+
 
 
   #############
