@@ -16,6 +16,8 @@ except ImportError:
   print("Could not import config, try adding the kiltiskahvi folder to your PYTHONPATH. Exiting.")
   sys.exit(1)
 
+from compute_nCups import compute_nCups
+
 # fall back to randomly generated sensor values if GPIO is not available
 try:
   import RPi.GPIO as GPIO
@@ -169,9 +171,7 @@ class Sensor():
   calibration parameters.
   """
   def compute_nCups(self, raw_value):
-    #import warnings
-    #raise NotImplementedError("No. of cups computation not implemented yet.")
-    return raw_value / 1024. * 10
+    return compute_nCups(self, raw_value)
 
 if __name__ == "__main__":
 
