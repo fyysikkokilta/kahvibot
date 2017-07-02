@@ -77,7 +77,7 @@ class KahviBot():
 
     text = msg["text"]
 
-    print(msg)
+    #print(msg)
 
     #TODO: handle commands...
     if text[0] == "/":
@@ -98,8 +98,8 @@ class KahviBot():
       if latest_measurement is None:
         reply = "Mittausdataa ei nähtävästi ole saatavilla."
       else:
-        pass
-
+        ans = "on" if latest_measurement["isCoffee"] else "ei ole"
+        reply = "Kiltahuoneella {} kahvia.".format(ans)
 
     if reply:
       bot.sendMessage(chat_id, reply,
