@@ -96,7 +96,7 @@ class KahviBot():
 
       latest_measurement = self.dbManager.query_latest()
       if latest_measurement is None:
-        reply = "Mittausdataa ei nähtävästi ole saatavilla."
+        reply = "Mittausdataa ei ole saatavilla."
       else:
         ans = "on" if latest_measurement["isCoffee"] else "ei ole"
         reply = "Kiltahuoneella {} kahvia.".format(ans)

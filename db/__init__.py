@@ -119,7 +119,11 @@ class DatabaseManager(object):
   This assumes that data_latest_collection contains always only one record.
   """
   def query_latest(self):
-    return self.data_latest_collection.find_one()
+    try:
+      #TODO: adjust timeout...
+      return self.data_latest_collection.find_one()
+    except pymongo.errors.ServerSelectionTimeoutError:
+      return None
 
   """
   Query all datapoints within the given tuple range.
