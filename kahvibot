@@ -33,6 +33,9 @@ class KahviBot():
     self.dbManager = db.DatabaseManager(config_dict)
 
     telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
+    # TODO: separate functions for handling message types
+    # see: https://telepot.readthedocs.io/en/latest/reference.html#message-loop-and-webhook
+    #telepot.loop.MessageLoop(self.bot, {"chat": self.handle_chat_message, "group": self.handle_group_message).run_as_thread()
 
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
 
