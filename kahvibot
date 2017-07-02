@@ -61,11 +61,13 @@ class KahviBot():
   handle /commands separately
   /plot command (?)
   proper /start message
-  structure this function better...
+  structure this function better, now everything is a mess of if-elses...
   handle inline messages (?)
   """
   def handle_message(self, msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
+    reply = None
+    bot = self.bot
 
     if content_type != "text":
       return
@@ -84,8 +86,22 @@ class KahviBot():
       reply_to = None
 
     if "kahvi" in text:
-      self.bot.sendMessage(chat_id, "En tiedä onko kiltiksellä kahvia.",
+      #bot.sendMessage(chat_id, "En tiedä onko kiltiksellä kahvia.",
+      #    reply_to_message_id = reply_to)
+
+      #reply = "En tiedä onko kiltiksellä kahvia."
+
+      latest_measurement = self.dbManager.query_latest()
+      if latest_measurement is None:
+        reply = "Mittausdataa ei nähtävästi ole saatavilla."
+      else:
+        pass
+
+
+    if reply:
+      bot.sendMessage(chat_id, reply,
           reply_to_message_id = reply_to)
+
 
 
   """
