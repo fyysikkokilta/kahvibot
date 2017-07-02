@@ -148,10 +148,16 @@ class Sensor():
 
     raw_value /= 1.0 * n
 
+    nCups = self.compute_nCups(raw_value)
+
+    # is there coffee?
+    isCoffee = nCups > 0.
+
     result = {}
 
     result["rawValue"] = raw_value
-    result["nCups"] = self.compute_nCups(raw_value)
+    result["nCups"] = nCups
+    result["isCoffee"] = isCoffee
 
     # TODO: compute standard deviation also.
     #result["std"] = ???

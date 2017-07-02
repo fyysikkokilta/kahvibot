@@ -87,7 +87,7 @@ class DatabaseManager(object):
 
     # simple (and dirty) data validation, raises a KeyError if a required field is missing
     # TODO: is there a better place for defining the required fields??
-    required_fields = ["timestamp", "rawValue", "nCups"]
+    required_fields = ["timestamp", "rawValue", "isCoffee"]
     [data_dict[field] for field in required_fields]
 
     # handle multiple datapoints #TODO (this check isn't good if we're using a dict)
