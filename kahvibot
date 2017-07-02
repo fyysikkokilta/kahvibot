@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+"""
+Program that operates a Telegram bot which can tell if there is coffee based on
+the entries in the database that the other 
+
+Based on telepot (https://github.com/nickoala/telepot).
+"""
+
+import telepot
+import telepot.loop
+import config, db
+import sys, time, syslog, signal
+
+"""
+A thin wrapper class for telepot, keeps a database manager instance open to 
+query the db.
+"""
+class KahviBot():
+  def __init__(self, config_dict = None):
+
+    if config_dict is None:
+      self.config_dict = config.get_config_dict()
+
+    # bind handling of SIGTERM to the appropriate function.
+    signal.signal(signal.SIGTERM, self.handle_sigterm)
+
+    self.poll_interval = float(config_dict["general"]["poll_interval"])
+    self.bot_token = config_dict["telegram"]["bot_token"]
+
+    self.bot = telepot.Bot(self.bot_token)
+
+    self.dbManager = db.DatabaseManager(config_dict)
+
+    telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
+
+    syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
+
+  """
+  Keep the program running (see: https://telepot.readthedocs.io/en/latest/),
+  not entirely sure if this is absolutely the best option, but going by the
+  example here.
+  """
+  def run(self):
+    try:
+      while True:
+        time.sleep(10)
+
+    # handle manual stop
+    except KeyboardInterrupt:
+      self.handle_sigterm()
+
+  """
+  The function for handling telegram messages.
+
+  TODOs / ideas:
+  respond in english if the message is in english
+  check if the coffee has been sitting over the night / if it's fresh
+  move message handling / message contents to separate file(s), implement a
+    dictionary structure or something
+  handle /commands separately
+  /plot command (?)
+  proper /start message
+  structure this function better...
+  handle inline messages (?)
+  """
+  def handle_message(self, msg):
+    content_type, chat_type, chat_id = telepot.glance(msg)
+
+    if content_type != "text":
+      return
+
+    text = msg["text"]
+
+    print(msg)
+
+    #TODO: handle commands...
+    if text[0] == "/":
+      pass
+
+    if chat_type == "group":
+      reply_to = msg["message_id"]
+    else:
+      reply_to = None
+
+    if "kahvi" in text:
+      self.bot.sendMessage(chat_id, "En tiedä onko kiltiksellä kahvia.",
+          reply_to_message_id = reply_to)
+
+
+  """
+  Function that gets executed upon exit (when systemd sends a SIGTERM). Handles
+  closing of db connections etc. (if necessary).
+  """
+  def handle_sigterm(self, *kwargs):
+    syslog.syslog(syslog.LOG_INFO, "kahvibot: Exiting.")
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+
+  cfg_dict = config.get_config_dict()
+
+  kb = KahviBot(cfg_dict)
+
+  # this will loop forever.
+  kb.run()
