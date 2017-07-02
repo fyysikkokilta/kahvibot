@@ -26,11 +26,13 @@ Mostly as a reminder for myself how the system is set up.
 ### Setup
 
 1. `git clone` the repo on to your device
-1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo`
+1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo telepot`
 1. Run `sudo systemctl enable mongodb && sudo service mongodb start` to start the mongodb server and make it start on boot. Check `/etc/mongodb.conf` to make sure that mongodb is bound to localhost.
 1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
 1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon. Check the syslog to see that it's working (or if it's not).
 1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
+1. Insert your telegram [bot token](https://core.telegram.org/bots#generating-an-authorization-token) in the configuration file in `config/config.ini`
+1. Start the telegram bot service: `sudo systemctl enable kahvibot && sudo service kahvibot start`
 1. Clone the repo or download the contents of the folder `web/` to your desired location on your webserver.
 1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `web/lib/` or wherever you copied the contents of `web` to
 1. Set up the `config` file in said folder according to the instructions in `config.default`
