@@ -23,7 +23,7 @@ NOTE: The mongodb database is located in /var/lib/mongodb (default for debian
 (I think)). All db paths are handled automagically by mongodb, so we try not to
 fiddle with those at all.
 """
-from pymongo import MongoClient
+import pymongo
 import sys
 import os
 import syslog
@@ -49,15 +49,11 @@ class DatabaseManager(object):
 
     else:
 
-      client = MongoClient("localhost", 27017) # hard-coded local db.
-
       # database and collection (~table) names are hardcoded... (good idea?)
-      db = client["kahvidb"]
-      datacollection = db["data"]
-
-      self.client = client
-      self.db = db
-      self.datacollection = datacollection
+      self.client = pymongo.MongoClient("localhost", 27017) # hard-coded local db.
+      self.db = self.client["kahvidb"]
+      self.datacollection = self.db["data"]
+      self.data_latest_collection = self.db["data-latest"]
 
       """
       A collection holding a single entry: the latest calibration parameters
@@ -99,7 +95,9 @@ class DatabaseManager(object):
     #  #TODO
     #  pass
 
-    self.datacollection.insert_one(data_dict)
+    # insert a copy as insert_one modifies the dict ...
+    self.datacollection.insert_one(data_dict.copy())
+    self.data_latest_collection.update({"_id" : 0}, data_dict.copy(), upsert = True)
 
   #TODO: calibration parameters
   #def update_calibration(self, calibrationDict):
@@ -115,6 +113,13 @@ class DatabaseManager(object):
   ############
   # QUERYING #
   ############
+
+  """
+  Query the latest measurement.
+  This assumes that data_latest_collection contains always only one record.
+  """
+  def query_latest(self):
+    return self.data_latest_collection.find_one()
 
   """
   Query all datapoints within the given tuple range.
