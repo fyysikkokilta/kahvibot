@@ -54,9 +54,10 @@ def main(config_dict = None):
     data["timestamp"] = time.time() #TODO: this or starting time?
 
     if sensor.is_dummy:
-      write_dummy(data)
-    else:
-      dbManager.insert_data(data)
+      # tag the data as dummy
+      data[db.DUMMY_TAG] = True
+
+    dbManager.insert_data(data)
 
     # if polling took longer than expected (for whatever reason), warn.
     if t - time.time() > poll_interval:
@@ -78,31 +79,6 @@ def handle_sigterm(*kwargs):
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
   sys.exit(0)
-
-
-"""
-A function that writes the data to a dummy output file instead, used only in 
-testing, when the GPIO is not available.
-"""
-def write_dummy(data):
-  import json
-  path = os.path
-
-  target_dir = path.join(
-        path.dirname(path.abspath(__file__)),
-        "db",
-        "dummy",
-        )
-
-  if not path.exists(target_dir):
-    syslog.syslog(syslog.LOG_WARNING, "Creating folder {} for dummy database output.".format(target_dir))
-    os.makedirs(target_dir)
-
-  os.chdir(target_dir)
-
-  # NOTE: this assumes that the file isn't open by someone else (i think)...
-  with open("dummy.txt", "a") as f:
-    f.write(json.dumps(data) + "\n")
 
 
 if __name__ == "__main__":

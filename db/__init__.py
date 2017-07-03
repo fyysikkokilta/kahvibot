@@ -28,6 +28,8 @@ import sys
 import os
 import syslog
 
+DUMMY_TAG = "dummy"
+
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
 A class to handle database queries. 
@@ -215,7 +217,6 @@ def dump_database(dump_path, config_dict, purge = False):
     print("Database {} appears to be empty. Exiting.".format(db.name))
     sys.exit(0)
 
-
   if not os.path.exists(dump_path):
     # TODO: create folder as necessary
     os.makedirs(dump_path)
@@ -257,6 +258,33 @@ def dump_database(dump_path, config_dict, purge = False):
       print("Dropping collection {}.".format(collName))
       db.drop_collection(collName)
 
+"""
+Remove all entries from the database that are marked as 'dummy'.
+"""
+def clean_database(config_dict):
+  dbm = DatabaseManager(config_dict)
+  dc = dbm.datacollection
+
+  tagged = dc.find({DUMMY_TAG: {"$exists" : True}})
+
+  c = tagged.count()
+
+  if c > 0:
+    ans = input("Found {} dummy entries. Are you sure you want to remove them? (y/n) ".format(c)).lower()
+    if not ans in ["yes", "y"]:
+      print("Aborting.")
+      return
+
+    removedCount = 0
+    for entry in tagged:
+      res = dc.delete_one(entry)
+      if res.acknowledged:
+        removedCount += res.deleted_count
+
+    print("Removed {} entries.".format(removedCount))
+
+  else:
+    print("No dummy entries found. Exiting.")
 
 
 """
@@ -293,6 +321,11 @@ if __name__ == "__main__":
       help = "Same as --dump but also delete database contents. Use at your own risk."
       )
 
+  ap.add_argument("--clean",
+      dest = "clean",
+      action = "store_true",
+      help = "Remove dummy entries from the database and exit. Dummy entries are created when the daemon runs but GPIO pins are not available."
+      )
 
   args = ap.parse_args()
 
@@ -305,6 +338,10 @@ if __name__ == "__main__":
 
   elif args.dump_path:
     dump_database(args.dump_path, cfg)
+    sys.exit(0)
+
+  elif args.clean:
+    clean_database(cfg)
     sys.exit(0)
 
 
