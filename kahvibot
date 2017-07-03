@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 """
 Program that operates a Telegram bot which can tell if there is coffee based on
@@ -66,11 +67,18 @@ class KahviBot():
   proper /start message
   structure this function better, now everything is a mess of if-elses...
   handle inline messages (?)
+  push notifications when there is coffee?
+  if multiple people are asking if there is coffee but there isn't any, tell 
+    them to make some
   """
   def handle_message(self, msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
+    bot_username = self.bot.getMe()["username"].lower()
     reply = None
+    reply_to = None
     bot = self.bot
+
+    isGroup = chat_type == "group"
 
     if content_type != "text":
       return
@@ -83,28 +91,56 @@ class KahviBot():
     if text[0] == "/":
       pass
 
-    if chat_type == "group":
+    if isGroup:
       reply_to = msg["message_id"]
+
+    if ("kahvi" in text or
+        "tsufe" in text or
+        (text.startswith("/status") and 
+          (text.endswith(bot_username) if isGroup else True)
+          )
+        ):
+
+      self.reply_current_coffee_amount(chat_id, reply_to)
+      return
+
+  """
+  This function gets called if an user has asked for the amount of coffee in
+  the coffee maker right now. It figures out the amount of coffee and sends the
+  appropriate response.
+  """
+  #TODO: handle language...
+  def reply_current_coffee_amount(self, chat_id, reply_to = None, lang = "fi"):
+    reply = None
+
+    latest_measurement = self.dbManager.query_latest()
+    if (
+        latest_measurement is None or
+        #TODO: is this hardcoded limit of 10 x the poll interval a good idea?
+        time.time() - latest_measurement["timestamp"] > self.poll_interval * 10
+        ):
+
+      # TODO: implement this language dictionary thing (for other branches as well...)
+      #reply = replies[lang]["dataNotAvailableMessage"]
+      reply = "Mittausdataa ei valitettavasti ole saatavilla."
+    
     else:
-      reply_to = None
-
-    if "kahvi" in text:
-      #bot.sendMessage(chat_id, "En tiedä onko kiltiksellä kahvia.",
-      #    reply_to_message_id = reply_to)
-
-      #reply = "En tiedä onko kiltiksellä kahvia."
-
-      latest_measurement = self.dbManager.query_latest()
-      if latest_measurement is None:
-        reply = "Mittausdataa ei ole saatavilla."
+      # TODO: check for stale coffee
+      #isStale = self.dbManager.query_stale_coffee()
+      #if isStale: ....
+      if latest_measurement["isCoffee"]:
+        reply = u"Kiltiksellä on kahvia! \u2615"
+        #TODO: incorporate nCups
+        #reply = "Kiltahuoneella on noin {} kuppia kahvia".format(latest_measurement["nCups"])
       else:
-        ans = "on" if latest_measurement["isCoffee"] else "ei ole"
-        reply = "Kiltahuoneella {} kahvia.".format(ans)
+        reply = "Kiltiksellä ei valitettavasti ole kahvia."
+        # TODO: if many people ask for coffee, ask users to make some
+        #if self.no_asked_for_coffee > self.ask_threshold:
+        #  reply += " Sen perään on kysellyt viimeaikoina sinun lisäksesi {} muuta käyttäjää. Ehkä olisi aika keittää uusi pannu?".format(self.no_asked_for_coffee)
+        #  # TODO: reset this counter when new coffee has been made
+        #  self.no_asked_for_coffee += 1 
 
-    if reply:
-      bot.sendMessage(chat_id, reply,
-          reply_to_message_id = reply_to)
-
+    self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
 
 
   """
