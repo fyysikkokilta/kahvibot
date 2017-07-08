@@ -96,7 +96,11 @@ class KahviBot():
         return
 
     except ValueError:
-      command = None
+      # if the message starts with '/' but isn't of the form foo@bar and we are in a group, ignore it.
+      if text[0] == "/" and not isGroup:
+        command = text
+      else:
+        command = None
 
     # if we are in a group, reply to the person who sent the command
     if isGroup:
