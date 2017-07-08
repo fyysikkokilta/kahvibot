@@ -63,9 +63,10 @@ class KahviBot():
   # TODO: notify users if their messages were flushed...
   def flush_messages(self):
     updates = self.bot.getUpdates()
-    syslog.syslog(syslog.LOG_INFO, "kahvibot: Flushing {} messages.".format(len(updates)))
-    # we assume that between here there's been no messages...
-    self.bot.getUpdates(updates[-1]["update_id"] + 1)
+    if updates:
+      syslog.syslog(syslog.LOG_INFO, "kahvibot: Flushing {} messages.".format(len(updates)))
+      # we assume that between here there's been no messages...
+      self.bot.getUpdates(updates[-1]["update_id"] + 1)
 
 
   """
