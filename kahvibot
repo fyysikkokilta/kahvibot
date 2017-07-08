@@ -200,6 +200,8 @@ class KahviBot():
     # This will be sent as a reply if something is wrong.
     error_msg = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
 
+    self.bot.sendChatAction(chat_id, "typing")
+
     if not plt:
       #TODO: language integration (?)
       self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
