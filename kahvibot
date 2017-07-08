@@ -82,12 +82,12 @@ class KahviBot():
     if content_type != "text":
       return
 
-    command = msg["text"]
+    text = msg["text"]
 
     # if we are in a group, make sure that we are being talked to.
     # this removes the @bot_username from the end of the command
     try:
-      command, command_target_username = command.split("@")
+      command, command_target_username = text.split("@")
       command = command.strip(); 
       command_target_username = command_target_username.strip()
 
@@ -95,16 +95,15 @@ class KahviBot():
         # we are in a group but the command is not aimed at us.
         return
 
-    # if the message isn't of the form 'foo@bar', leave command unaffected.
     except ValueError:
-      pass
+      command = None
 
     # if we are in a group, reply to the person who sent the command
     if isGroup:
       reply_to = msg["message_id"]
 
-    if ("kahvi" in command or
-        "tsufe" in command or
+    if ("kahvi" in text or
+        "tsufe" in text or
         command == "/status"
         ):
 
