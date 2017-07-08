@@ -197,11 +197,12 @@ class KahviBot():
   This assumes that nCups is available in the database.
   """
   def reply_plot(self, chat_id, reply_to = None, lang = "fi"):
+    # This will be sent as a reply if something is wrong.
+    error_msg = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
 
     if not plt:
       #TODO: language integration (?)
-      reply = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
-      self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
+      self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
       return 
 
     # plot coffee for the last half hour 
@@ -212,6 +213,11 @@ class KahviBot():
         (time.time() - length, time.time()), 
         projection = {"_id" : False, "nCups": True, "timestamp": True}
         )
+
+    if data.count() == 0:
+      self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
+      return
+
 
     # TODO: does this looping twice and rewinding cause issues with performance?
     x = [datetime.datetime.fromtimestamp(d["timestamp"]) for d in data]
