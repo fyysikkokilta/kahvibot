@@ -136,7 +136,7 @@ class DatabaseManager(object):
   item...
   """
   #TODO: if count is more than MAX_ITEMS, return every nth item, where n = count // MAX_ITEMS (or sth)
-  def query_range(self, r):
+  def query_range(self, r, projection = {}):
     try:
       (start, end) = r
 
@@ -155,7 +155,7 @@ class DatabaseManager(object):
       query_result = (
           self
           .datacollection
-          .find({"timestamp": {"$gte": start, "$lte": end}}, {"_id": False})
+          .find({"timestamp": {"$gte": start, "$lte": end}}, projection = {"_id": False, **projection})
           .sort("timestamp", pymongo.ASCENDING)
           .limit(MAX_ITEMS)
           )
