@@ -17,6 +17,8 @@ try:
   import matplotlib
   matplotlib.use("Agg") # has to be before other matplotlib imports to enable "headlessness"
   import matplotlib.pyplot as plt
+  from matplotlib.dates import DateFormatter
+  import datetime
   import tempfile
 except ImportError:
   # mark that matplotlib is not available
@@ -170,8 +172,9 @@ class KahviBot():
 
 
   """
-  Send a reply containing a plot of the recent coffee measurements. If 
-  matplotlib is not available, reply with a message saying so.
+  Send a reply containing a plot of recent coffee measurements. If matplotlib 
+  is not available, reply with a message saying so.
+  This assumes that nCups is available in the database.
   """
   def reply_plot(self, chat_id, reply_to = None, lang = "fi"):
 
@@ -180,6 +183,45 @@ class KahviBot():
       reply = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
       self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
       return 
+
+    # plot coffee for the last half hour 
+    # TODO: hardcoding good idea? make configurable?
+    length = 30 * 60
+    
+    data = self.dbManager.query_range(
+        (time.time() - length, time.time()), 
+        projection = {"_id" : False, "nCups": True, "timestamp": True}
+        )
+
+    # TODO: does this looping twice and rewinding cause issues with performance?
+    x = [datetime.datetime.fromtimestamp(d["timestamp"]) for d in data]
+    data.rewind()
+    y = [d["nCups"] for d in data]
+
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(x, y)
+
+    # TODO: make plots prettier
+    # TODO: latex stuff ? (might be a hassle if tex isn't installed)
+
+    ax.xaxis.set_major_formatter(DateFormatter("%H:%M"))
+
+    ax.set_xlabel(u"Klo")
+    ax.set_ylabel(u"Kahvikuppia")
+    ax.grid("on", linestyle = ":")
+    fig.suptitle(u"Kahvin määrä") #, fontsize = ???)
+
+    #TODO: is this necessary, hardcoding good idea?
+    #ax.set_ylim((0, 10))
+
+    with tempfile.TemporaryFile(suffix = ".png") as f:
+
+      plt.savefig(f)
+
+      f.seek(0)
+
+      self.bot.sendPhoto(chat_id, f, reply_to_message_id = reply_to)
 
 
   """
