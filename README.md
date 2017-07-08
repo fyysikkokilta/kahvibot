@@ -26,7 +26,7 @@ Mostly as a reminder for myself how the system is set up.
 ### Setup
 
 1. `git clone` the repo on to your device
-1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo telepot`
+1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo telepot matplotlib`. `matplotlib` is optional.
 1. Run `sudo systemctl enable mongodb && sudo service mongodb start` to start the mongodb server and make it start on boot. Check `/etc/mongodb.conf` to make sure that mongodb is bound to localhost.
 1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
 1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon. Check the syslog to see that it's working (or if it's not).
