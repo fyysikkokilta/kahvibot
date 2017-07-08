@@ -126,6 +126,10 @@ class KahviBot():
       self.reply_current_coffee_amount(chat_id, reply_to)
       return
 
+    if command == "/plot":
+      self.reply_plot(chat_id, reply_to)
+      return
+
   """
   This function gets called if an user has asked for the amount of coffee in
   the coffee maker right now. It figures out the amount of coffee and sends the
