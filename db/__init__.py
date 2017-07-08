@@ -262,6 +262,15 @@ def dump_database(dump_path, config_dict, purge = False):
     if not ans in ["y", "yes"]:
       print("Aborting.")
       sys.exit(1)
+
+  if purge:
+    ans = input(
+        "Are you sure you want to erase ALL data from the database? (y/n) "
+        ).lower()
+
+    if not ans in ["y", "yes"]:
+      print("Aborting.")
+      sys.exit(1)
     
 
   os.chdir(dump_path)
