@@ -152,10 +152,13 @@ class DatabaseManager(object):
       
       #TODO: aggregate collections
 
+      proj = {"_id": False}
+      proj.update(projection)
+
       query_result = (
           self
           .datacollection
-          .find({"timestamp": {"$gte": start, "$lte": end}}, projection = {"_id": False, **projection})
+          .find({"timestamp": {"$gte": start, "$lte": end}}, projection = proj)
           .sort("timestamp", pymongo.ASCENDING)
           .limit(MAX_ITEMS)
           )
