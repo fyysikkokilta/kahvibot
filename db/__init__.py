@@ -128,16 +128,41 @@ class DatabaseManager(object):
       return None
 
   """
-  Query all datapoints within the given tuple range.
+  Query all datapoints within the given tuple (start, end), inclusive, where
+  start and end are floats representing unix time.
+  Returs a pymongo cursor object which can then be iterated over.
+  Returns a maximum of MAX_ITEMS items, which is currently hardcoded (ugh).
+  Also if MAX_ITEMS is exceeded, returns the latest items instead of every nth
+  item...
   """
+  #TODO: if count is more than MAX_ITEMS, return every nth item, where n = count // MAX_ITEMS (or sth)
   def query_range(self, r):
     try:
       (start, end) = r
-      c = self._conn.cursor()
-      c.execute("SELECT * FROM ???")
-      query_result = c.fetchall()
+
+      # TODO: is this necessary? or is mongodb error checking sufficient?
+      assert (
+          (type(start) == float or type(start) == int) and
+          (type(end) == float or type(end) == int)
+          ), "Start or end wasn't float or int: {}".format(r)
+
+      # don't return more than this many items
+      #TODO: this shouldn't be hardcoded (at least not here)...
+      MAX_ITEMS = 200
+      
+      #TODO: aggregate collections
+
+      query_result = (
+          self
+          .datacollection
+          .find({"timestamp": {"$gte": start, "$lte": end}}, {"_id": False})
+          .sort("timestamp", pymongo.ASCENDING)
+          .limit(MAX_ITEMS)
+          )
+
       return query_result
-    except (ValueError, TypeError) as e:
+
+    except (ValueError, TypeError, AssertionError) as e:
       #TODO: do this properly...
       raise DBException("Invalid database range: {}.".format(e))
 
