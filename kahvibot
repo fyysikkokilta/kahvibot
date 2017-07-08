@@ -74,7 +74,6 @@ class KahviBot():
   def handle_message(self, msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
     bot_username = self.bot.getMe()["username"]
-    reply = None
     reply_to = None
     bot = self.bot
 
@@ -83,20 +82,30 @@ class KahviBot():
     if content_type != "text":
       return
 
-    text = msg["text"]
+    command = msg["text"]
 
-    #TODO: handle commands...
-    if text[0] == "/":
+    # if we are in a group, make sure that we are being talked to.
+    # this removes the @bot_username from the end of the command
+    try:
+      command, command_target_username = command.split("@")
+      command = command.strip(); 
+      command_target_username = command_target_username.strip()
+
+      if isGroup and command_target_username.lower() != bot_username.lower():
+        # we are in a group but the command is not aimed at us.
+        return
+
+    # if the message isn't of the form 'foo@bar', leave command unaffected.
+    except ValueError:
       pass
 
+    # if we are in a group, reply to the person who sent the command
     if isGroup:
       reply_to = msg["message_id"]
 
-    if ("kahvi" in text or
-        "tsufe" in text or
-        (text.startswith("/status") and 
-          (text.lower().endswith(bot_username.lower()) if isGroup else True)
-          )
+    if ("kahvi" in command or
+        "tsufe" in command or
+        command == "/status"
         ):
 
       self.reply_current_coffee_amount(chat_id, reply_to)
