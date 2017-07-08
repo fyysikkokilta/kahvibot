@@ -13,6 +13,15 @@ import telepot.loop
 import config, db
 import sys, time, syslog, signal
 
+try:
+  import matplotlib
+  matplotlib.use("Agg") # has to be before other matplotlib imports to enable "headlessness"
+  import matplotlib.pyplot as plt
+  import tempfile
+except ImportError:
+  # mark that matplotlib is not available
+  plt = False
+
 """
 A thin wrapper class for telepot, keeps a database manager instance open to 
 query the db.
@@ -32,6 +41,9 @@ class KahviBot():
     self.bot = telepot.Bot(self.bot_token)
 
     self.dbManager = db.DatabaseManager(config_dict)
+
+    if not plt:
+      syslog.syslog(syslog.LOG_WARNING, "kahvibot: Plotting not available.")
 
     telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
     # TODO: separate functions for handling message types
@@ -151,6 +163,19 @@ class KahviBot():
         #  self.no_asked_for_coffee += 1 
 
     self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
+
+
+  """
+  Send a reply containing a plot of the recent coffee measurements. If 
+  matplotlib is not available, reply with a message saying so.
+  """
+  def reply_plot(self, chat_id, reply_to = None, lang = "fi"):
+
+    if not plt:
+      #TODO: language integration (?)
+      reply = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
+      self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
+      return 
 
 
   """
