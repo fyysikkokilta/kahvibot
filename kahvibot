@@ -73,7 +73,7 @@ class KahviBot():
   """
   def handle_message(self, msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
-    bot_username = self.bot.getMe()["username"].lower()
+    bot_username = self.bot.getMe()["username"]
     reply = None
     reply_to = None
     bot = self.bot
@@ -85,8 +85,6 @@ class KahviBot():
 
     text = msg["text"]
 
-    #print(msg)
-
     #TODO: handle commands...
     if text[0] == "/":
       pass
@@ -97,7 +95,7 @@ class KahviBot():
     if ("kahvi" in text or
         "tsufe" in text or
         (text.startswith("/status") and 
-          (text.endswith(bot_username) if isGroup else True)
+          (text.lower().endswith(bot_username.lower()) if isGroup else True)
           )
         ):
 
