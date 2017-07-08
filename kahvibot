@@ -47,12 +47,26 @@ class KahviBot():
     if not plt:
       syslog.syslog(syslog.LOG_WARNING, "kahvibot: Plotting not available.")
 
+    # flush messages on startup.
+    self.flush_messages()
+
     telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
     # TODO: separate functions for handling message types
     # see: https://telepot.readthedocs.io/en/latest/reference.html#message-loop-and-webhook
     #telepot.loop.MessageLoop(self.bot, {"chat": self.handle_chat_message, "group": self.handle_group_message).run_as_thread()
 
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
+
+  """
+  Flush messages in the update queue. Useful when the bot has been offline.
+  """
+  # TODO: notify users if their messages were flushed...
+  def flush_messages(self):
+    updates = self.bot.getUpdates()
+    syslog.syslog(syslog.LOG_INFO, "kahvibot: Flushing {} messages.".format(len(updates)))
+    # we assume that between here there's been no messages...
+    self.bot.getUpdates(updates[-1]["update_id"] + 1)
+
 
   """
   Keep the program running (see: https://telepot.readthedocs.io/en/latest/),
