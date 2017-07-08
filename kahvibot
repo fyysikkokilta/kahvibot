@@ -105,12 +105,17 @@ class KahviBot():
       command = command.strip(); 
       command_target_username = command_target_username.strip()
 
-      if isGroup and command_target_username.lower() != bot_username.lower():
-        # we are in a group but the command is not aimed at us.
+      if (isGroup and 
+          # is the command aimed at someone else?
+          (len(command.split()) == 1 and
+          len(command_target_username.split()) == 1) and
+          command_target_username.lower() != bot_username.lower()
+          ):
+        # We are in a group but the command is not aimed at us. Return.
         return
 
     except ValueError:
-      # if the message starts with '/' but isn't of the form foo@bar and we are in a group, ignore it.
+      # if the message starts with '/' but isn't of the form foo@bar and we are in a group, assume that there's no command.
       if text[0] == "/" and not isGroup:
         command = text
       else:
@@ -121,7 +126,7 @@ class KahviBot():
       reply_to = msg["message_id"]
 
     if ("kahvi" in text or
-        "tsufe" in text or
+        "tsufe" in text or # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
         command == "/status"
         ):
 
