@@ -268,8 +268,18 @@ class KahviBot():
 
 
 if __name__ == "__main__":
+  import argparse
 
-  cfg_dict = config.get_config_dict()
+  ap = argparse.ArgumentParser(description = "Run a telegram bot that tells how much coffee there is.")
+
+  ap.add_argument("-c", "--config",
+      dest = "config_file",
+      help = "Use CONFIG_FILE as the configuration file instead of the default."
+      )
+
+  args = ap.parse_args()
+
+  cfg_dict = config.get_config_dict(args.config_file)
 
   kb = KahviBot(cfg_dict)
 
