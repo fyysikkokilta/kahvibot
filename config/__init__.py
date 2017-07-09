@@ -50,6 +50,7 @@ def get_config_dict(filename = None):
 
 if __name__ == "__main__":
   import argparse
+  from pprint import pprint
 
   ap = argparse.ArgumentParser()
   ap.add_argument("-c", "--config",
@@ -59,4 +60,8 @@ if __name__ == "__main__":
   args = ap.parse_args()
 
   cfg = get_config_dict(args.config_file)
-  print(str(cfg))
+
+  for sec in cfg.sections():
+    print("{}:".format(sec))
+    pprint(list(cfg[sec].items()))
+    print("")
