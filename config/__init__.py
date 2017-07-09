@@ -15,7 +15,7 @@ Default options
 _CONFIG_DEFAULTS = {
       "general": {
           "poll_interval": 10,
-          "averaging_time": 9,
+          "averaging_time": 5,
       },
 
       "calibration" : {
@@ -24,7 +24,11 @@ _CONFIG_DEFAULTS = {
       },
 
       "database" : {
-        "dbname": "kahvidb"
+        "dbname": "kahvidb",
+      },
+
+      "telegram" : {
+        "bot_token" : ""
       },
 
     }
@@ -46,6 +50,10 @@ def get_config_dict(filename = None):
 
   syslog.syslog(syslog.LOG_INFO, "config: Using configuration file " + filename)
   cp.read(filename)
+
+  # check for placeholder telegram bot token
+  if all(map(lambda x: x == "X", cp["telegram"]["bot_token"])):
+    cp["telegram"]["bot_token"] = ""
 
   return cp
 
