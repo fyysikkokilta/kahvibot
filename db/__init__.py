@@ -51,12 +51,16 @@ class DatabaseManager(object):
 
     else:
 
-      db_name = config_dict["database"]["dbname"]
+      db_config = config_dict["database"]
+
+      db_name = db_config["dbname"]
 
       self.client = pymongo.MongoClient("localhost", 27017) # hard-coded local db.
       self.db = self.client[db_name]
       self.datacollection = self.db["data"]
       self.data_latest_collection = self.db["data-latest"]
+
+      self.range_query_max_items = int(db_config["range_query_max_items"])
 
       """
       A collection holding a single entry: the latest calibration parameters
@@ -132,11 +136,12 @@ class DatabaseManager(object):
   Query all datapoints within the given tuple (start, end), inclusive, where
   start and end are floats representing unix time.
   Returs a pymongo cursor object which can then be iterated over.
-  Returns a maximum of MAX_ITEMS items, which is currently hardcoded (ugh).
-  Also if MAX_ITEMS is exceeded, returns the latest items instead of every nth
-  item...
+  Returns a maximum of self.range_query_max_items items, which is set in the
+  configuration.
+  If the item limit is exceeded, returns the latest items instead of every nth
+    item...
   """
-  #TODO: if count is more than MAX_ITEMS, return every nth item, where n = count // MAX_ITEMS (or sth)
+  #TODO: if count is more than max_items, return every nth item, where n = count // MAX_ITEMS (or sth)
   def query_range(self, r, projection = {}):
     try:
       (start, end) = r
@@ -147,9 +152,6 @@ class DatabaseManager(object):
           (type(end) == float or type(end) == int)
           ), "Start or end wasn't float or int: {}".format(r)
 
-      # don't return more than this many items
-      #TODO: this shouldn't be hardcoded (at least not here)...
-      MAX_ITEMS = 200
       
       #TODO: aggregate collections
 
@@ -161,7 +163,8 @@ class DatabaseManager(object):
           .datacollection
           .find({"timestamp": {"$gte": start, "$lte": end}}, projection = proj)
           .sort("timestamp", pymongo.ASCENDING)
-          .limit(MAX_ITEMS)
+          # don't return more than this many items
+          .limit(self.range_query_max_items)
           )
 
       return query_result
