@@ -38,6 +38,7 @@ class KahviBot():
     signal.signal(signal.SIGTERM, self.handle_sigterm)
 
     self.poll_interval = float(config_dict["general"]["poll_interval"])
+    self.max_ncups = float(config_dict["calibration"]["max_ncups"])
 
     bot_token = config_dict["telegram"]["bot_token"]
     if not bot_token:
@@ -243,8 +244,7 @@ class KahviBot():
     ax.grid("on", linestyle = ":")
     fig.suptitle(u"Kahvin määrä") #, fontsize = ???)
 
-    #TODO: is this necessary, hardcoding good idea?
-    #ax.set_ylim((0, 10))
+    ax.set_ylim((0, self.max_ncups))
 
     with tempfile.TemporaryFile(suffix = ".png") as f:
 

@@ -21,6 +21,7 @@ _CONFIG_DEFAULTS = {
       "calibration" : {
         "sensor_min_value" : 0,
         "sensor_max_value" : 1024,
+        "max_ncups" : 10.0,
       },
 
       "database" : {
