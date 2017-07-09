@@ -28,8 +28,11 @@ import sys
 import os
 import syslog
 import re
+<<<<<<< HEAD
 
 DUMMY_TAG = "dummy"
+=======
+>>>>>>> f3df2b8feebb4b4fc13dad4a2cf2c6c98ae5b60e
 
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
