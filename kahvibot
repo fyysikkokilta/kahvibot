@@ -38,8 +38,11 @@ class KahviBot():
     signal.signal(signal.SIGTERM, self.handle_sigterm)
 
     self.poll_interval = float(config_dict["general"]["poll_interval"])
-    self.bot_token = config_dict["telegram"]["bot_token"]
 
+    bot_token = config_dict["telegram"]["bot_token"]
+    if not bot_token:
+      raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
+    self.bot_token = bot_token
     self.bot = telepot.Bot(self.bot_token)
 
     self.dbManager = db.DatabaseManager(config_dict)
