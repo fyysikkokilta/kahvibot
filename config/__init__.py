@@ -30,7 +30,8 @@ _CONFIG_DEFAULTS = {
       },
 
       "telegram" : {
-        "bot_token" : ""
+        "bot_token" : "",
+        "plot_length" : 30.0,
       },
 
     }

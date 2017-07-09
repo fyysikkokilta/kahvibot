@@ -34,13 +34,15 @@ class KahviBot():
     if config_dict is None:
       self.config_dict = config.get_config_dict()
 
+    telegram_config = config_dict["telegram"]
+
     # bind handling of SIGTERM to the appropriate function.
     signal.signal(signal.SIGTERM, self.handle_sigterm)
 
     self.poll_interval = float(config_dict["general"]["poll_interval"])
     self.max_ncups = float(config_dict["calibration"]["max_ncups"])
 
-    bot_token = config_dict["telegram"]["bot_token"]
+    bot_token = telegram_config["bot_token"]
     if not bot_token:
       raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
     self.bot_token = bot_token
@@ -48,6 +50,7 @@ class KahviBot():
 
     self.dbManager = db.DatabaseManager(config_dict)
 
+    self.plot_length = float(telegram_config["plot_length"])
     if not plt:
       syslog.syslog(syslog.LOG_WARNING, "kahvibot: Plotting not available.")
 
@@ -211,12 +214,9 @@ class KahviBot():
       self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
       return 
 
-    # plot coffee for the last half hour 
-    # TODO: hardcoding good idea? make configurable?
-    length = 30 * 60
-    
+    t = time.time()
     data = self.dbManager.query_range(
-        (time.time() - length, time.time()), 
+        (t - self.plot_length * 60, t), 
         projection = {"_id" : False, "nCups": True, "timestamp": True}
         )
 
