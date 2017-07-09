@@ -32,6 +32,7 @@ _CONFIG_DEFAULTS = {
       "telegram" : {
         "bot_token" : "",
         "plot_length" : 30.0,
+        "data_unavailable_threshold" : 30.0,
       },
 
     }

@@ -54,6 +54,8 @@ class KahviBot():
     if not plt:
       syslog.syslog(syslog.LOG_WARNING, "kahvibot: Plotting not available.")
 
+    self.data_unavailable_threshold = float(telegram_config["data_unavailable_threshold"])
+
     # flush messages on startup.
     self.flush_messages()
 
@@ -171,8 +173,7 @@ class KahviBot():
     latest_measurement = self.dbManager.query_latest()
     if (
         latest_measurement is None or
-        #TODO: is this hardcoded limit of 10 x the poll interval a good idea?
-        time.time() - latest_measurement["timestamp"] > self.poll_interval * 10
+        time.time() - latest_measurement["timestamp"] > self.data_unavailable_threshold
         ):
 
       # TODO: implement this language dictionary thing (for other branches as well...)
