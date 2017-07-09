@@ -51,9 +51,10 @@ class DatabaseManager(object):
 
     else:
 
-      # database and collection (~table) names are hardcoded... (good idea?)
+      db_name = config_dict["database"]["dbname"]
+
       self.client = pymongo.MongoClient("localhost", 27017) # hard-coded local db.
-      self.db = self.client["kahvidb"]
+      self.db = self.client[db_name]
       self.datacollection = self.db["data"]
       self.data_latest_collection = self.db["data-latest"]
 

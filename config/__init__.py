@@ -23,6 +23,10 @@ _CONFIG_DEFAULTS = {
         "sensor_max_value" : 1024,
       },
 
+      "database" : {
+        "dbname": "kahvidb"
+      },
+
     }
 
 """
