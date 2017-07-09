@@ -55,6 +55,15 @@ class DatabaseManager(object):
 
       db_name = db_config["dbname"]
 
+      # test the connection with a client with a timeout of 10ms.
+      try:
+        pymongo.MongoClient("localhost", 27017, serverSelectionTimeoutMS = 10).server_info()
+      except pymongo.errors.ServerSelectionTimeoutError as e:
+        if "Errno 111" in e.args[0]:
+          raise ConnectionRefusedError("Database connection refused. Is mongodb running?") from e
+        else:
+          raise
+
       self.client = pymongo.MongoClient("localhost", 27017) # hard-coded local db.
       self.db = self.client[db_name]
       self.datacollection = self.db["data"]
