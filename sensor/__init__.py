@@ -30,7 +30,7 @@ except ImportError:
     def input(self, foo):
       return random.randint(0,1)
 
-    # override all other functions to return 0
+    # override all other methods to return 0
     def __getattr__(self, *a):
       return lambda *x: 0
 
@@ -68,14 +68,15 @@ class Sensor():
     GPIO.setup(SPICLK, GPIO.OUT)
     GPIO.setup(SPICS, GPIO.OUT)
   
-  # advance the ADC clock by one
-  def _adc_tick(self, clk = SPICLK):
-    GPIO.output(clk, True)
-    GPIO.output(clk, False)
   
   # read from  the ADC
   def _read_adc(self, adc_num = 0, 
       clockpin = SPICLK, mosipin = SPIMOSI, misopin = SPIMISO, cspin = SPICS): 
+
+    # helper function for advancing the ADC clock by one
+    def adc_tick(clk = SPICLK):
+      GPIO.output(clk, True)
+      GPIO.output(clk, False)
   
     if (adc_num > 7) or (adc_num < 0):
       return -1
@@ -94,11 +95,11 @@ class Sensor():
       else:
         GPIO.output(mosipin, False)
       command_out <<=1
-      self._adc_tick()
+      adc_tick()
   
     adc_out = 0
     for i in range(12):
-      self._adc_tick(clockpin)
+      adc_tick(clockpin)
   
       adc_out <<= 1
   
