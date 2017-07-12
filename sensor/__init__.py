@@ -70,7 +70,7 @@ class Sensor():
   
   
   # read from  the ADC
-  def _read_adc(self, adc_num = 0, 
+  def read_adc(self, adc_num = 0,
       clockpin = SPICLK, mosipin = SPIMOSI, misopin = SPIMISO, cspin = SPICS): 
 
     # helper function for advancing the ADC clock by one
@@ -137,7 +137,7 @@ class Sensor():
     if not averaging_time:
       averaging_time = self.averaging_time
 
-    fun = self._read_adc
+    fun = self.read_adc
     #fun = self._dummy_adc
     start = time.time()
     raw_value = 0
