@@ -1,12 +1,10 @@
 """
-The package 'sensor' is responsible for handling
-sensor input i.e. reading the FSR.
+The package 'sensor' is responsible for handling sensor input i.e. reading the 
+FSR and calculating the number of coffee cups based on the calibration defined
+in the configuration files.
 
 Needs to be run as root to access the GPIO pins.
-
-Mostly copied from https://gist.github.com/ladyada/3151375
 """
-
 
 
 import time, os, sys, syslog
@@ -16,11 +14,15 @@ except ImportError:
   print("Could not import config, try adding the kiltiskahvi folder to your PYTHONPATH. Exiting.")
   sys.exit(1)
 
-# fall back to randomly generated sensor values if GPIO is not available
+# fall back to dummy driver if GPIO is not available
 try:
   import RPi.GPIO as GPIO
+  from .drivers.adafruit_mmcp3008 import read_adc
 except ImportError:
-  syslog.syslog(syslog.LOG_WARNING, "sensor: WARNING: no RPi module available, falling back to dummy GPIO")
+  syslog.syslog(syslog.LOG_WARNING, "sensor: WARNING: no RPi module available, falling back to dummy GPIO.")
+
+  # use the dummy function
+  from .drivers.dummy import read_adc
 
   import random
 
