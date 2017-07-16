@@ -16,38 +16,18 @@ except ImportError:
 
 # fall back to dummy driver if GPIO is not available
 try:
-  import RPi.GPIO as GPIO
-  from .drivers.adafruit_mmcp3008 import read_adc
-except ImportError:
+  from .drivers import adafruit_mcp3008 as driver
+  DUMMY_DRIVER = False
+except ImportError as e:
+  if e.name != "RPi":
+    # importing of some other module than RPi (which contains GPIO) failed
+    raise
+
   syslog.syslog(syslog.LOG_WARNING, "sensor: WARNING: no RPi module available, falling back to dummy GPIO.")
 
-  # use the dummy function
-  from .drivers.dummy import read_adc
-
-  import random
-
-  class GPIO_dummy():
-
-    # this is quite dirty
-    def input(self, foo):
-      return random.randint(0,1)
-
-    # override all other methods to return 0
-    def __getattr__(self, *a):
-      return lambda *x: 0
-
-
-  GPIO = GPIO_dummy()
-
-GPIO.setmode(GPIO.BCM)
-
-# pin setup constants. BCM numbers. see also: http://pinout.xyz
-#TODO: should these be read from the config?
-SPICLK = 12
-SPIMISO = 5
-SPIMOSI = 6
-SPICS = 26
-#mcp = Adafruit_MCP3008.MCP3008(clk = SPICLK, cs = SPICS, miso = SPIMISO, mosi = SPIMOSI)
+  # GPIO is not available, use dummy ADC function
+  from .drivers import dummy as driver
+  DUMMY_DRIVER = True
 
 
 class Sensor():
@@ -63,72 +43,8 @@ class Sensor():
     self.averaging_time = float(cfg_dict["general"]["averaging_time"])
 
     # this attribute can be used to check if the GPIO module is working
-    self.is_dummy = not GPIO.__name__ == "RPi.GPIO"
+    self.is_dummy = DUMMY_DRIVER
 
-    GPIO.setup(SPIMOSI, GPIO.OUT)
-    GPIO.setup(SPIMISO, GPIO.IN)
-    GPIO.setup(SPICLK, GPIO.OUT)
-    GPIO.setup(SPICS, GPIO.OUT)
-  
-  
-  # read from  the ADC
-  def read_adc(self, adc_num = 0,
-      clockpin = SPICLK, mosipin = SPIMOSI, misopin = SPIMISO, cspin = SPICS): 
-
-    # helper function for advancing the ADC clock by one
-    def adc_tick(clk = SPICLK):
-      GPIO.output(clk, True)
-      GPIO.output(clk, False)
-  
-    if (adc_num > 7) or (adc_num < 0):
-      return -1
-  
-    GPIO.output(cspin, True)
-    GPIO.output(clockpin, False)
-    GPIO.output(cspin, False)
-  
-    command_out = adc_num
-    command_out |= 0x18 # start bit + single-ended bit (what does this mean?)
-    command_out <<= 3
-  
-    for i in range(5):
-      if(command_out & 0x80):
-        GPIO.output(mosipin, True)
-      else:
-        GPIO.output(mosipin, False)
-      command_out <<=1
-      adc_tick()
-  
-    adc_out = 0
-    for i in range(12):
-      adc_tick(clockpin)
-  
-      adc_out <<= 1
-  
-      if GPIO.input(misopin):
-        adc_out |= 0x1
-  
-    GPIO.output(cspin, True)
-    adc_out >>= 1
-    return adc_out
-  
-  
-  # a function that generates random numbers in the same range
-  # as the real adc, for testing purposes.
-  
-  def _dummy_adc(self):
-    import random
-    import time
-    from math import floor
-    prev = 0
-    t = time.time()
-    while True:
-      prev += (random.randrange(100) - 20) * int(floor(time.time() - t))
-      prev %= 1024
-      t = time.time()
-      yield prev
-  
-  
   """
   The function that returns the sensor value after averaging,
   this is supposed to be called externally.
@@ -139,13 +55,11 @@ class Sensor():
     if not averaging_time:
       averaging_time = self.averaging_time
 
-    fun = self.read_adc
-    #fun = self._dummy_adc
     start = time.time()
     raw_value = 0
     n = 0
     while time.time() - start < averaging_time:
-      raw_value += fun()
+      raw_value += driver.read_adc()
       n += 1
       time.sleep(avg_interval)
 
@@ -176,6 +90,7 @@ class Sensor():
     #raise NotImplementedError("No. of cups computation not implemented yet.")
     return raw_value / 1024. * 10
 
+
 if __name__ == "__main__":
 
   cfg = config.get_config_dict()
@@ -204,5 +119,5 @@ if __name__ == "__main__":
       time.sleep(0.05)
 
   except KeyboardInterrupt:
-    GPIO.cleanup()
+    driver.cleanup()
     raise

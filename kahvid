@@ -74,7 +74,7 @@ exiting.
 def handle_sigterm(*kwargs):
 
   syslog.syslog(syslog.LOG_INFO, "Cleaning up GPIO...")
-  sensorPackage.GPIO.cleanup()
+  sensorPackage.driver.cleanup()
 
   syslog.syslog(syslog.LOG_INFO, "Exiting.")
 
