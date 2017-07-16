@@ -255,6 +255,9 @@ class KahviBot():
 
       self.bot.sendPhoto(chat_id, f, reply_to_message_id = reply_to)
 
+    # close the figure to not take up memory.
+    fig.close()
+
 
   """
   Function that gets executed upon exit (when systemd sends a SIGTERM). Handles
