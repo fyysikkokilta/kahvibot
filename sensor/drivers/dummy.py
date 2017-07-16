@@ -18,7 +18,7 @@ def create_dummy_generator():
       prev = max(min(prev, 1023), 0) # clip values
 
       # 'empty' the coffee maker.
-      if prev > 900 and random.expovariate((time.time() - t) / (tau * 2)) > tau * 2:
+      if prev > 1000 and random.random() < 1e-2:
         t = time.time()
       yield prev
 
