@@ -29,6 +29,7 @@ Mostly as a reminder for myself how the system is set up.
 1. Install dependencies: `sudo apt install mongodb`, `sudo pip3 install flask pymongo telepot matplotlib`. `matplotlib` is optional.
 1. Run `sudo systemctl enable mongodb && sudo service mongodb start` to start the mongodb server and make it start on boot. Check `/etc/mongodb.conf` to make sure that mongodb is bound to localhost.
 1. Run `sudo python3 setup.py` (this just creates a systemd script in `/etc/systemd/system/`).
+1. Set up your hardware, calibration and configs (see below)
 1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon. Check the syslog to see that it's working (or if it's not).
 1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
 1. Insert your telegram [bot token](https://core.telegram.org/bots#generating-an-authorization-token) in the configuration file in `config/config.ini`
@@ -45,4 +46,5 @@ Mostly as a reminder for myself how the system is set up.
 ### Configuration, calibration
 **TODO**
 
-
+# Hardware setup
+If you're using an MCP3008 ADC to read out your sensor, adjust your wiring and the pinouts in `sensor/drivers/adafruit_mcp3008` to match. Otherwise, you can write your own driver for ADC readout, see the README in `sensor/drivers/` for instructions.
