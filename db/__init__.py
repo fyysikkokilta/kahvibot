@@ -113,7 +113,8 @@ class DatabaseManager(object):
 
     # insert a copy as insert_one modifies the dict ...
     self.datacollection.insert_one(data_dict.copy())
-    self.data_latest_collection.update({"_id" : 0}, data_dict.copy(), upsert = True)
+    data_dict["_id"] = 0
+    self.data_latest_collection.replace_one({u"_id" : 0}, data_dict.copy(), upsert = True)
 
   #TODO: calibration parameters
   #def update_calibration(self, calibrationDict):
