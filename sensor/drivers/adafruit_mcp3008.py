@@ -20,7 +20,7 @@ GPIO.setup(SPIMISO, GPIO.IN)
 GPIO.setup(SPICLK, GPIO.OUT)
 GPIO.setup(SPICS, GPIO.OUT)
 
-def read_adc(sensor, adc_num = 0,
+def read_adc(adc_num = 0,
     clockpin = SPICLK, mosipin = SPIMOSI, misopin = SPIMISO, cspin = SPICS):
 
     # helper function for advancing the ADC clock by one
