@@ -16,7 +16,7 @@ except ImportError:
 
 # fall back to dummy driver if GPIO is not available
 try:
-  from .drivers import adafruit_mcp3008 as driver
+  from sensor.drivers import hx711 as driver
   DUMMY_DRIVER = False
 except ImportError as e:
   if e.name != "RPi":
@@ -26,7 +26,7 @@ except ImportError as e:
   syslog.syslog(syslog.LOG_WARNING, "sensor: WARNING: no RPi module available, falling back to dummy GPIO.")
 
   # GPIO is not available, use dummy ADC function
-  from .drivers import dummy as driver
+  from sensor.drivers import dummy as driver
   DUMMY_DRIVER = True
 
 
