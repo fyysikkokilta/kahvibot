@@ -66,6 +66,7 @@ class HX711:
 
         self.setChannelGainFactor()
         signedValue = self.correctForTwosComplement( unsignedValue )
+        signedValue *= -1 # so that pressing on the scale gives positive values.
 
         self.lastVal = signedValue
         return self.lastVal
