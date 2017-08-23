@@ -116,11 +116,11 @@ if __name__ == "__main__":
         rawValue = rawValue_new
         nCups = nCups_new
 
-      fmt = "{:0>4} {:>7.1f} {:>12.1f}"
+      fmt = "{:0=10} {:>7.1f} {:>12.1f}"
       sys.stdout.write(fmt.format(rawValue, nCups, time.time()) + "\r")
       sys.stdout.flush()
       time.sleep(0.05)
 
-  except KeyboardInterrupt:
+  except Exception:
     driver.cleanup()
     raise
