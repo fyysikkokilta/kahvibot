@@ -18,7 +18,6 @@ class HX711:
 
         self.GAIN = 0
         self.OFFSET = 0
-        self.SCALE = 1
         self.lastVal = 0
 
         self.set_gain(gain)
@@ -81,15 +80,9 @@ class HX711:
     def get_value(self, times=3):
         return self.read_average(times) - self.OFFSET
 
-    def get_units(self, times=3):
-        return self.get_value(times) / self.SCALE
-
     def tare(self, times=15):
         sum = self.read_average(times)
         self.set_offset(sum)
-
-    def set_scale(self, scale):
-        self.SCALE = scale
 
     def set_offset(self, offset):
         self.OFFSET = offset
@@ -113,22 +106,16 @@ except KeyboardInterrupt:
   GPIO.cleanup()
   sys.exit()
 
-hx.set_scale(7050)
+scale = 20000.
 hx.tare()
 
 while True:
     try:
-        nAverages = 5
-        #val = 0
-        #for i in range(nAverages):
-        #  m = hx.get_units(1)
-        #  val += m
-        #val /= nAverages
-        val = hx.get_units(1)
+        val = hx.get_value(1) / scale
         offset = max(1,min(80,int(val+40)))
         otherOffset = 100-offset;
-        print (" "*offset+"#"+" "*otherOffset+"{0: 4.4f}".format(val));
-        #sys.stdout.write(" "*offset+"#"+" "*otherOffset+"{0: 4.4f}".format(val) + "\r")
+        print (" "*offset+"#"+" "*otherOffset+"{: 4.4f} ({: 4.4f})".format(val, val * scale));
+        #sys.stdout.write(" "*offset+"#"+" "*otherOffset+"{0: 4.4f}".format(val) + "\r") # non-moving version
         time.sleep(0.05)
     except (KeyboardInterrupt, SystemExit):
       print("cleaning up.")
