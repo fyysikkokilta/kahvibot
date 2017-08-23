@@ -29,6 +29,9 @@ except ImportError as e:
   from sensor.drivers import dummy as driver
   DUMMY_DRIVER = True
 
+REQUIRED_FUNCTIONS = ["read_adc", "cleanup"]
+for fn in REQUIRED_FUNCTIONS:
+  assert hasattr(driver, fn), "Driver {} doesn't implement {}().".format(driver.__name__, fn)
 
 class Sensor():
   # set up SPI interface pins and read configuration
