@@ -118,7 +118,7 @@ while True:
         print (" "*offset+"#"+" "*otherOffset+"{: 4.4f} ({: 4.4f})".format(val, val * scale));
         #sys.stdout.write(" "*offset+"#"+" "*otherOffset+"{0: 4.4f}".format(val) + "\r") # non-moving version
         time.sleep(0.05)
-    except (KeyboardInterrupt, SystemExit):
+    except (KeyboardInterrupt, SystemExit, AttributeError):
       print("cleaning up.")
       GPIO.cleanup()
-      break
+      raise
