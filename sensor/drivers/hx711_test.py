@@ -32,6 +32,7 @@ class HX711:
         elif gain is 64:
             self.GAIN = 3
         elif gain is 32:
+            # NOTE: using gain 32 uses channel 'B' on the controller
             self.GAIN = 2
 
         GPIO.output(self.PD_SCK, False)
@@ -53,7 +54,7 @@ class HX711:
             return unsignedValue
 
     def read(self):
-        #self.waitForReady();
+        self.waitForReady();
         unsignedValue = 0
 
         for i in range(0,self.readBits):
@@ -104,7 +105,7 @@ class HX711:
 import sys
 
 try:
-  hx = HX711(6, 5, 64)
+  hx = HX711(6, 5, 32)
   #hx = HX711(26, 6, 64)
   #hx = HX711(26, 6, 32)
 except KeyboardInterrupt:
