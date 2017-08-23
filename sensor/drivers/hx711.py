@@ -95,14 +95,6 @@ class HX711:
     def set_offset(self, offset):
         self.OFFSET = offset
 
-    def power_down(self):
-        GPIO.output(self.PD_SCK, False)
-        GPIO.output(self.PD_SCK, True)
-
-    def power_up(self):
-        GPIO.output(self.PD_SCK, False)
-
-
 if __name__ == "__main__":
   # a small test
 
