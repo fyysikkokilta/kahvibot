@@ -179,22 +179,21 @@ class KahviBot():
       # TODO: implement this language dictionary thing (for other branches as well...)
       #reply = replies[lang]["dataNotAvailableMessage"]
       reply = "Mittausdataa ei valitettavasti ole saatavilla."
-    
+
     else:
       # TODO: check for stale coffee
       #isStale = self.dbManager.query_stale_coffee()
       #if isStale: ....
       if latest_measurement["isCoffee"]:
-        reply = u"Kiltiksellä on kahvia! \u2615"
-        #TODO: incorporate nCups
-        #reply = "Kiltahuoneella on noin {} kuppia kahvia".format(latest_measurement["nCups"])
+        nCups = round(latest_measurement["nCups"])
+        reply = "Kiltiksellä on noin {} kuppi{} kahvia! \u2615".format(nCups, "a" if nCups > 1 else "")
       else:
         reply = "Kiltiksellä ei valitettavasti ole kahvia."
         # TODO: if many people ask for coffee, ask users to make some
         #if self.no_asked_for_coffee > self.ask_threshold:
         #  reply += " Sen perään on kysellyt viimeaikoina sinun lisäksesi {} muuta käyttäjää. Ehkä olisi aika keittää uusi pannu?".format(self.no_asked_for_coffee)
         #  # TODO: reset this counter when new coffee has been made
-        #  self.no_asked_for_coffee += 1 
+        #  self.no_asked_for_coffee += 1
 
     self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
 
@@ -213,7 +212,7 @@ class KahviBot():
     if not plt:
       #TODO: language integration (?)
       self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
-      return 
+      return
 
     t = time.time()
     data = self.dbManager.query_range(
