@@ -105,6 +105,8 @@ class Sensor():
   Returns: nCups: None if the decanter is missing, otherwise no. of coffee cups as a float.
   """
   # TODO: should the case of the missing decanter be handled elsewhere?
+  # TODO: save definition of compute_ncups to database, use e.g. inspect.getsource
+  #   (see: https://stackoverflow.com/questions/1562759/can-python-print-a-function-definition)
   def compute_nCups(self, raw_value):
 
     cal = self.calibration
