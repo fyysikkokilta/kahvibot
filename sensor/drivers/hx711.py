@@ -11,6 +11,7 @@ GPIO.setmode(GPIO.BCM)
 # TODO: read these from the config?
 CLKPIN = 5
 DATAPIN = 6
+GAIN = 128
 
 class HX711:
     def __init__(self, dout, pd_sck, gain=128, readBits=24):
@@ -73,7 +74,7 @@ class HX711:
 
         self.setChannelGainFactor()
         signedValue = self.correctForTwosComplement( unsignedValue )
-        signedValue *= -1 # so that pressing on the scale gives positive values.
+        #signedValue *= -1 # so that pressing on the scale gives positive values.
 
         self.lastVal = signedValue
         return self.lastVal
@@ -99,20 +100,21 @@ if __name__ == "__main__":
   # a small test
 
   import sys, time
-  
+
   try:
-    hx = HX711(DATAPIN, CLKPIN, 32)
+    #hx = HX711(DATAPIN, CLKPIN, 32)
+    hx = HX711(DATAPIN, CLKPIN, GAIN)
   except KeyboardInterrupt:
     print("exiting")
     GPIO.cleanup()
     sys.exit()
-  
+
   scale = 20000.
-  hx.tare()
-  
+  #hx.tare()
+
   while True:
       try:
-          val = hx.get_value(1) / scale
+          val = hx.get_value(10) / scale
           offset = max(1,min(80,int(val+40)))
           otherOffset = 100-offset;
           print (" "*offset+"#"+" "*otherOffset+"{: 4.4f} ({: 4.4f})".format(val, val * scale));
@@ -124,8 +126,8 @@ if __name__ == "__main__":
         raise
 
 else:
-  hx = HX711(DATAPIN, CLKPIN, 32)
-  hx.tare()
+  hx = HX711(DATAPIN, CLKPIN, GAIN)
+  #hx.tare()
   def read_adc():
     return hx.read()
 
