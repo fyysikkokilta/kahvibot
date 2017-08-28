@@ -101,12 +101,36 @@ class Sensor():
   """
   Compute the number of cups a given raw sensor value corresponds to, using the
   calibration parameters.
-  """
-  def compute_nCups(self, raw_value):
-    #import warnings
-    #raise NotImplementedError("No. of cups computation not implemented yet.")
-    return raw_value / 1024. * 10
 
+  Returns: nCups: None if the decanter is missing, otherwise no. of coffee cups as a float.
+  """
+  # TODO: should the case of the missing decanter be handled elsewhere?
+  def compute_nCups(self, raw_value):
+
+    cal = self.calibration
+    tol = float(cal["sensor_error_tol"]) * 0.01
+    lims = ((1-tol) * raw_value, (1+tol) * raw_value)
+
+    #TODO: these first two ifs might be wrong
+    if lims[1] < float(cal["coffee_no_decanter_value"]):
+      return None #TODO: consider -1 or something...
+
+    if lims[0] < float(cal["coffee_empty_decanter_value"]) < lims[1]:
+      return 0.
+
+    else:
+      empty_val = float(cal["coffee_empty_decanter_value"])
+      full_val = float(cal["coffee_full_value"])
+      max_nCups = float(cal["max_ncups"])
+      nCups = (raw_value - empty_val) / (full_val - empty_val) * max_nCups
+      if nCups > max_nCups or nCups < 0:
+        #TODO: check these manually...
+        #syslog.syslog(syslog.LOG_WARNING, "sensor: incorrect nCups value: {nCups} (raw_value: {raw_value}, empty_val: {empty_val}, full_val: {full_val}, max_nCups: {max_nCups})".format(**locals()))
+        pass
+
+      nCups = max(min(max_nCups, nCups), 0.)
+
+      return nCups
 
 if __name__ == "__main__":
 
