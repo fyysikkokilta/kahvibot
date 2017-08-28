@@ -70,14 +70,28 @@ class Sensor():
 
     nCups = self.compute_nCups(raw_value)
 
+    #TODO: CLEAR UP THIS HACKY MESS
+
     # is there coffee?
-    isCoffee = nCups > 0.
+    # NOTE: works even if nCups is None... (None > 0 == False)
+    isCoffee = False
+    if nCups is not None:
+      isCoffee = nCups > 0.
+
+    # TODO: rename this to decanterMissing or sth more descriptive...
+    # is the tray empty?
+    trayEmpty = nCups is None
+
+    # insert zero instead of null...
+    if nCups is None:
+      nCups = 0.
 
     result = {}
 
     result["rawValue"] = raw_value
     result["nCups"] = nCups
     result["isCoffee"] = isCoffee
+    result["trayEmpty"] = trayEmpty
 
     # TODO: compute standard deviation also.
     #result["std"] = ???
