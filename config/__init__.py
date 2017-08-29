@@ -26,7 +26,7 @@ _CONFIG_DEFAULTS = {
 
       "database" : {
         "dbname": "kahvidb",
-        "range_query_max_items": 200,
+        "range_query_max_items": 1000,
       },
 
       "telegram" : {
