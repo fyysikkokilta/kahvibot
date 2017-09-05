@@ -52,8 +52,11 @@ def get_config_dict(filename = None):
   # read default values from dict if they are not given in the config file.
   cp.read_dict(_CONFIG_DEFAULTS)
 
-  syslog.syslog(syslog.LOG_INFO, "config: Using configuration file " + filename)
+  if not path.exists(filename):
+    raise IOError("Configuration file {} does not exist.".format(filename))
+
   cp.read(filename)
+  syslog.syslog(syslog.LOG_INFO, "config: Using configuration file " + filename)
 
   # check for placeholder telegram bot token
   if all(map(lambda x: x == "X", cp["telegram"]["bot_token"])):
