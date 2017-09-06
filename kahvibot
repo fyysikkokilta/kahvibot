@@ -3,7 +3,7 @@
 
 """
 Program that operates a Telegram bot which can tell if there is coffee based on
-the entries in the database that the other 
+the entries in the database that the other
 
 Based on telepot (https://github.com/nickoala/telepot).
 """
@@ -25,7 +25,7 @@ except ImportError:
   plt = False
 
 """
-A thin wrapper class for telepot, keeps a database manager instance open to 
+A thin wrapper class for telepot, keeps a database manager instance open to
 query the db.
 """
 class KahviBot():
@@ -77,6 +77,63 @@ class KahviBot():
       # we assume that between here there's been no messages...
       self.bot.getUpdates(updates[-1]["update_id"] + 1)
 
+  """
+  Send a message and log it to the syslog.
+
+  Params:
+    chat_id: chat ID to send the message to
+    msg_from: the dictionary given by Telepot.Message["from"]
+    message: The message content to send.  Can be e.g. text or an image file
+      handle.
+    send_fun: the function to use for sending (i.e. bot.sendMessage or
+      bot.sendPhoto). Default is self.bot.sendMessage (text)
+    **kwargs: these are passed onto send_fun
+  """
+  def send_and_log(self, chat_id, msg_from, message, send_fun = None,
+                   **kwargs):
+    first = last = uname = ""
+
+    if send_fun is None:
+      send_fun = self.bot.sendMessage
+
+    try:
+      first = msg_from["first_name"]
+    except KeyError:
+      pass
+    try:
+      last = msg_from["last_name"]
+    except KeyError:
+      pass
+    try:
+      uname = msg_from["username"]
+    except KeyError:
+      pass
+
+
+    send_fun(chat_id, message, **kwargs)
+
+    log_msg = "kahvibot: sent "
+    if send_fun == self.bot.sendMessage:
+      log_msg += "text "
+    elif send_fun == self.bot.sendPhoto:
+      log_msg += "photo "
+
+    log_msg += "message to "
+    if first:
+      log_msg += first + " "
+    if last:
+      log_msg += last + " "
+    if uname:
+      log_msg += "({}) ".format(uname)
+
+    log_msg = log_msg.strip()
+
+    if first or last or uname:
+      log_msg += ","
+
+    log_msg += " chat ID {}.".format(chat_id)
+
+    syslog.syslog(syslog.LOG_INFO, log_msg)
 
   """
   Keep the program running (see: https://telepot.readthedocs.io/en/latest/),
@@ -106,11 +163,12 @@ class KahviBot():
   structure this function better, now everything is a mess of if-elses...
   handle inline messages (?)
   push notifications when there is coffee?
-  if multiple people are asking if there is coffee but there isn't any, tell 
+  if multiple people are asking if there is coffee but there isn't any, tell
     them to make some
   """
   def handle_message(self, msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
+    msg_from = msg["from"]
     bot_username = self.bot.getMe()["username"]
     reply_to = None
     bot = self.bot
@@ -126,10 +184,10 @@ class KahviBot():
     # this removes the @bot_username from the end of the command
     try:
       command, command_target_username = text.split("@")
-      command = command.strip(); 
+      command = command.strip();
       command_target_username = command_target_username.strip()
 
-      if (isGroup and 
+      if (isGroup and
           # is the command aimed at someone else?
           (len(command.split()) == 1 and
           len(command_target_username.split()) == 1) and
@@ -154,11 +212,11 @@ class KahviBot():
         command == "/status"
         ):
 
-      self.reply_current_coffee_amount(chat_id, reply_to)
+      self.reply_current_coffee_amount(chat_id, msg_from, reply_to)
       return
 
     if command == "/plot":
-      self.reply_plot(chat_id, reply_to)
+      self.reply_plot(chat_id, msg_from, reply_to)
       return
 
   """
@@ -167,7 +225,7 @@ class KahviBot():
   appropriate response.
   """
   #TODO: handle language...
-  def reply_current_coffee_amount(self, chat_id, reply_to = None, lang = "fi"):
+  def reply_current_coffee_amount(self, chat_id, msg_from, reply_to = None, lang = "fi"):
     reply = None
 
     latest_measurement = self.dbManager.query_latest()
@@ -195,15 +253,15 @@ class KahviBot():
         #  # TODO: reset this counter when new coffee has been made
         #  self.no_asked_for_coffee += 1
 
-    self.bot.sendMessage(chat_id, reply, reply_to_message_id = reply_to)
+    self.send_and_log(chat_id, msg_from, reply, reply_to_message_id = reply_to)
 
 
   """
-  Send a reply containing a plot of recent coffee measurements. If matplotlib 
+  Send a reply containing a plot of recent coffee measurements. If matplotlib
   is not available, reply with a message saying so.
   This assumes that nCups is available in the database.
   """
-  def reply_plot(self, chat_id, reply_to = None, lang = "fi"):
+  def reply_plot(self, chat_id, msg_from, reply_to = None, lang = "fi"):
     # This will be sent as a reply if something is wrong.
     error_msg = u"Kuvaajien piirtäminen ei valitettavasti onnistu tällä hetkellä."
 
@@ -211,17 +269,17 @@ class KahviBot():
 
     if not plt:
       #TODO: language integration (?)
-      self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
+      self.send_and_log(chat_id, msg_from, error_msg, reply_to_message_id = reply_to)
       return
 
     t = time.time()
     data = self.dbManager.query_range(
-        (t - self.plot_length * 60, t), 
+        (t - self.plot_length * 60, t),
         projection = {"_id" : False, "nCups": True, "timestamp": True}
         )
 
     if data.count() < 2:
-      self.bot.sendMessage(chat_id, error_msg, reply_to_message_id = reply_to)
+      self.send_and_log(chat_id, msg_from, error_msg, reply_to_message_id = reply_to)
       return
 
 
@@ -252,7 +310,8 @@ class KahviBot():
 
       f.seek(0)
 
-      self.bot.sendPhoto(chat_id, f, reply_to_message_id = reply_to)
+      self.send_and_log(chat_id, msg_from, f, send_fun = self.bot.sendPhoto,
+                        reply_to_message_id = reply_to)
 
     # close the figure to not take up memory.
     plt.close(fig)
