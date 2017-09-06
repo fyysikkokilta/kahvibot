@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
   while True:
       try:
-          val = hx.get_value(10) / scale
+          val = hx.get_value(1) / scale
           offset = max(1,min(80,int(val+40)))
           otherOffset = 100-offset;
           print (" "*offset+"#"+" "*otherOffset+"{: 4.4f} ({: 4.4f})".format(val, val * scale));
