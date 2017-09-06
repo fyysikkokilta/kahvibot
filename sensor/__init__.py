@@ -110,17 +110,18 @@ class Sensor():
   def compute_nCups(self, raw_value):
 
     cal = self.calibration
-    tol = float(cal["sensor_error_tol"]) * 0.01
-    lims = ((1-tol) * raw_value, (1+tol) * raw_value)
+    #tol = float(cal["sensor_error_tol"]) * 0.01
+    #lims = ((1-tol) * raw_value, (1+tol) * raw_value)
 
-    #TODO: these first two ifs might be wrong
-    if lims[1] < float(cal["coffee_no_decanter_value"]):
-      return None #TODO: consider -1 or something...
+    ##TODO: these first two ifs might be wrong
+    #if lims[1] < float(cal["coffee_no_decanter_value"]):
+    #  return None #TODO: consider -1 or something...
 
-    if lims[0] < float(cal["coffee_empty_decanter_value"]) < lims[1]:
-      return 0.
+    #if lims[0] < float(cal["coffee_empty_decanter_value"]) < lims[1]:
+    #  return 0.
 
-    else:
+    # TODO
+    if True:
       empty_val = float(cal["coffee_empty_decanter_value"])
       full_val = float(cal["coffee_full_value"])
       max_nCups = float(cal["max_ncups"])
