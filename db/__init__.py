@@ -389,7 +389,7 @@ if __name__ == "__main__":
       dest = "dump_count",
       default = None,
       type = int,
-      help = "When used with --dump, --purge or --clean, only apply operation to the COUNT latest database entries."
+      help = "When used with --dump or --purge, only apply operation to the DUMP_COUNT latest database entries."
       )
 
   args = ap.parse_args()
