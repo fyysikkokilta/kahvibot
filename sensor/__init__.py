@@ -8,6 +8,7 @@ Needs to be run as root to access the GPIO pins.
 
 
 import time, os, sys, syslog
+from math import sqrt
 try:
   import config
 except ImportError:
@@ -59,14 +60,23 @@ class Sensor():
       averaging_time = self.averaging_time
 
     start = time.time()
-    raw_value = 0
-    n = 0
+
+    datapoints = []
+
     while time.time() - start < averaging_time:
-      raw_value += driver.read_adc()
-      n += 1
+      adc_result = driver.read_adc()
+      datapoints.append(adc_result)
+
       time.sleep(avg_interval)
 
-    raw_value /= 1.0 * n
+
+    s = sum(datapoints)
+    n = len(datapoints)
+
+    raw_value = s / n
+
+    # standard deviation
+    std = sqrt(sum([(x - raw_value) ** 2 for x in datapoints]) / (n - 1))
 
     nCups = self.compute_nCups(raw_value)
 
@@ -86,16 +96,19 @@ class Sensor():
     if nCups is None:
       nCups = 0.
 
+    if std > 500:
+      syslog.syslog(syslog.LOG_WARNING,
+          "sensor: unusually high std. raw_value: {raw_value}, n: {n}, std: {std}".format(**locals()))
+
     result = {}
 
     result["rawValue"] = raw_value
+    result["nMeasurements"] = n
+    result["std"] = std
     result["nCups"] = nCups
     result["isCoffee"] = isCoffee
     result["trayEmpty"] = trayEmpty
 
-    # TODO: compute standard deviation also.
-    #result["std"] = ???
-    #print("poll result: {} ({} averages)".format(res, n))
     return result
 
   """
