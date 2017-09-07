@@ -5,18 +5,18 @@ For each measurement, we store the raw value of the sensor, a timestamp, the
 number of cups the sensor value corresponds to and possible additional
 information (standard deviation? something else?). The no. of cups as a
 function of raw sensor value may change depending on the sensor and calibration
-parameters. 
+parameters.
 
 The calibration parameters are stored separately, and a new entry is added only
 when the parameters change. This should make earlier raw sensor values
 compatible with newer measurements (in theory), as long as the method for
-calculating them is known. 
+calculating them is known.
 A user need not worry about this, as the no. of cups is assumed to be correct
 for each calibration.
 
-Possibly in the future, different collections (~tables, see mongodb docs) may 
-be used corresponding to different levels of aggregation. In this case the db 
-manager handles aggregation and querying the appropriate database if the query 
+Possibly in the future, different collections (~tables, see mongodb docs) may
+be used corresponding to different levels of aggregation. In this case the db
+manager handles aggregation and querying the appropriate database if the query
 is a range.
 
 NOTE: The mongodb database is located in /var/lib/mongodb (default for debian
@@ -32,20 +32,20 @@ DUMMY_TAG = "dummy"
 
 #TODO: does the connection need to be closd manually w/ mongodb?
 """
-A class to handle database queries. 
+A class to handle database queries.
 """
 class DatabaseManager(object):
 
   def __init__(self, config_dict, dummy = False):
     #TODO
-    
+
     # override query function with dummy function
     # note: this if-else structure is pretty stupid...
     if dummy:
       self.query_range = self.query_dummy_range
       self.query = self.query_dummy
       syslog.syslog(
-          syslog.LOG_WARNING, 
+          syslog.LOG_WARNING,
           "db: Overwriting query functions with dummy ones."
       )
 
@@ -220,13 +220,13 @@ class DBException(Exception):
 
 
 """
-Return a suitable folder name for dumping database contents by using a 
+Return a suitable folder name for dumping database contents by using a
 timestamp. Don't create the folder, that must be done elsewhere.
 """
 def get_default_dump_path():
   import time
   folderBaseName = os.path.join(
-      os.path.dirname(os.path.abspath(__file__)), 
+      os.path.dirname(os.path.abspath(__file__)),
       "dump",
       "dump-" + time.strftime("%Y-%m-%d-%H%M", time.localtime())
       )
@@ -241,9 +241,10 @@ def get_default_dump_path():
   return folderName
 
 """
-Dump database contents using mongoexport and drop collections if specified. 
+Dump database contents using mongoexport and drop collections if specified.
 """
-def dump_database(dump_path, config_dict, purge = False):
+def dump_database(dump_path, config_dict, count = None, purge = False):
+  import json
 
   dbm = DatabaseManager(config_dict)
   db = dbm.db
@@ -253,7 +254,7 @@ def dump_database(dump_path, config_dict, purge = False):
       lambda x: not x.startswith("system."),
       db.collection_names()
       ))
-  
+
   # doing this check here prevents from creating folders if it's not necessary.
   if not collectionNames:
     print("Database {} appears to be empty. Exiting.".format(db.name))
@@ -285,7 +286,7 @@ def dump_database(dump_path, config_dict, purge = False):
     if not ans in ["y", "yes"]:
       print("Aborting.")
       sys.exit(1)
-    
+
 
   os.chdir(dump_path)
 
@@ -295,19 +296,25 @@ def dump_database(dump_path, config_dict, purge = False):
 
     fname = collName + ".json"
 
-    command = "mongoexport --db {} --collection {} --out {}".format(
-        db.name, collName, fname
-        )
+    n_exported = 0
 
-    print("executing {}".format(command))
-    retval = os.system(command)
+    with open(fname, "w") as f:
+      print("Exporting collection {} to {}".format(collName, fname))
+      cursor = db[collName].find()
+      if count is not None:
+        cursor = cursor.sort("timestamp", pymongo.DESCENDING).limit(count)
 
-    if retval != 0:
-      raise Exception("Shell exited with error (return value {}).".format(retval))
+      for record in cursor:
+        record["_id"] = {"$oid" : str(record["_id"])}
+        f.write(json.dumps(record) + "\n")
+        n_exported += 1
+
+    print("Exported {} records.".format(n_exported))
 
     if purge:
       print("Dropping collection {}.".format(collName))
       db.drop_collection(collName)
+
 
 """
 Remove all entries from the database that are marked as 'dummy'.
@@ -378,17 +385,24 @@ if __name__ == "__main__":
       help = "Remove dummy entries from the database and exit. Dummy entries are created when the daemon runs but GPIO pins are not available."
       )
 
+  ap.add_argument("-n", "--count",
+      dest = "dump_count",
+      default = None,
+      type = int,
+      help = "When used with --dump, --purge or --clean, only apply operation to the COUNT latest database entries."
+      )
+
   args = ap.parse_args()
 
   # TODO: is config even necessary for the DB manager? -- yes, for checking changes in the calibration (might not be the smartest way to do it though.
   cfg = config.get_config_dict(args.config_file)
 
   if args.purge_dump_path:
-    dump_database(args.purge_dump_path, cfg, purge = True)
+    dump_database(args.purge_dump_path, cfg, count = args.dump_count, purge = True)
     sys.exit(0)
 
   elif args.dump_path:
-    dump_database(args.dump_path, cfg)
+    dump_database(args.dump_path, cfg, count = args.dump_count)
     sys.exit(0)
 
   elif args.clean:
