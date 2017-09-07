@@ -39,19 +39,24 @@ if __name__ == "__main__":
   calibration = {}
 
 
-  for param, msg in instructions:
-    input(msg + "\n")
-    print("Calibrating (averaging for {} seconds)...".format(AVG_TIME))
-    poll_result = s.poll(averaging_time = AVG_TIME, avg_interval = 0.001) #TODO: adjust these timings
-    rawValue = poll_result["rawValue"]
+  try:
+    for param, msg in instructions:
+      input(msg + "\n")
+      print("Calibrating (averaging for {} seconds)...".format(AVG_TIME))
+      poll_result = s.poll(averaging_time = AVG_TIME, avg_interval = 0.001) #TODO: adjust these timings
+      rawValue = poll_result["rawValue"]
+      std = poll_result["std"]
 
-    #sys.stdout.write(fmt.format(rawValue, timestamp) + "\r")
-    #sys.stdout.flush()
+      #sys.stdout.write(fmt.format(rawValue, timestamp) + "\r")
+      #sys.stdout.flush()
 
-    calibration[param] = rawValue
+      calibration[param] = (rawValue, std)
+  except KeyboardInterrupt:
+    pass
 
-  sensor.driver.cleanup()
+  finally:
+    sensor.driver.cleanup()
 
   print("Finished. Your calibration parameters are:")
   for k, v in calibration.items():
-    print("{}: {}".format(k, v))
+    print("{}: {} (std: {})".format(k, v[0], v[1]))
