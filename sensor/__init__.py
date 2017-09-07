@@ -96,9 +96,10 @@ class Sensor():
     if nCups is None:
       nCups = 0.
 
-    if std > 500:
+    relative_std = std / abs(raw_value)
+    if relative_std > 0.5:
       syslog.syslog(syslog.LOG_WARNING,
-          "sensor: unusually high std. raw_value: {raw_value}, n: {n}, std: {std}".format(**locals()))
+          "sensor: unusually high std. raw_value: {raw_value}, n: {n}, std: {std} (relative: {relative_std:.2f})".format(**locals()))
 
     result = {}
 
