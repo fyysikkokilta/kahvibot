@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-The main measurement program, responsible for polling the sensor periodically 
-and inserting the results into a database. 
+The main measurement program, responsible for polling the sensor periodically
+and inserting the results into a database.
 
 Must be run as root (to access the GPIO and to create a PID file).
 """
@@ -15,7 +15,7 @@ import config
 import sensor as sensorPackage
 
 """
-The main function, containing an infinite loop that polls the sensor 
+The main function, containing an infinite loop that polls the sensor
 periodically as specified by poll_interval in the config and writes the results
 to a database.
 """
@@ -30,8 +30,10 @@ def main(config_dict = None):
   # set up sensor instance and poll intervals
   sensor = sensorPackage.Sensor(config_dict)
   poll_interval = float(config_dict["general"]["poll_interval"])
+
+  syslog.openlog("kahvid", syslog.LOG_PID)
   syslog.syslog(
-      syslog.LOG_INFO, 
+      syslog.LOG_INFO,
       "Poll interval: {} s, averaging time: {} s.".format(
         poll_interval, sensor.averaging_time
         )
@@ -68,7 +70,7 @@ def main(config_dict = None):
 
 
 """
-Function that does everything necessary (closing db connections etc.) before 
+Function that does everything necessary (closing db connections etc.) before
 exiting.
 """
 def handle_sigterm(*kwargs):
@@ -87,8 +89,8 @@ if __name__ == "__main__":
 
   parser = argparse.ArgumentParser("Main script for coffee measurement daemon.")
 
-  parser.add_argument("-c", "--config", 
-      dest = "config_path", default = None, 
+  parser.add_argument("-c", "--config",
+      dest = "config_path", default = None,
       action="store",
       help = "Read configuration file from CONFIG_PATH instead of the default."
       )
