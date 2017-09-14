@@ -42,6 +42,8 @@ def main(config_dict = None):
   # create a db manager instance
   dbManager = db.DatabaseManager(config_dict)
 
+  dbManager.update_calibration(dict(config_dict["calibration"]), time.time())
+
   syslog.syslog(syslog.LOG_INFO, "Starting measurements.")
 
   # wait until the clock is even (with regard to the poll interval)

@@ -79,9 +79,9 @@ class DatabaseManager(object):
       """
       #TODO: this whole thing
       #TODO: check for changed parameters
-      #self.calibrationParams = db["calibration-last"]
+      self.calibration_latest_collection = self.db["calibration-latest"]
       # this contains a history of calibration dictionaries.
-      #self.calibrationDicts = db["calibration-history"]
+      self.calibration_history_collection = self.db["calibration-history"]
 
 
   #############
@@ -116,15 +116,35 @@ class DatabaseManager(object):
     data_dict["_id"] = 0
     self.data_latest_collection.replace_one({u"_id" : 0}, data_dict.copy(), upsert = True)
 
-  #TODO: calibration parameters
-  #def update_calibration(self, calibrationDict):
+  """
+  Compare the given calibration_dict to the latest calibration in the database.
+  If they differ, store the new calibration to the calibration history.
+  This should be needed only when starting kahvid.
+  """
+  def update_calibration(self, calibration_dict, timestamp):
+    calibration_dict = dict(calibration_dict) # just to be sure.
 
-    #self.db["calibration-last"].update_one(
-    #  {"_id": 0},  # this ensures that calibrationParams will only have one value.
-    #  {"calibrationDict" : calibrationDict},
-    #  upsert = True
-    #)
-    #self.db["calibrationDicts"].insert_one({"timestamp" : time.time(), "calibrationDict": calibrationDict})
+    calibration_dict_key = "calibrationDict"
+
+    old_calibration_doc = self.calibration_latest_collection.find({"_id": 0}) #["calibrationDict"]
+    assert old_calibration_doc.count() <= 1
+
+    try:
+      old_calibration_dict = old_calibration_doc[0][calibration_dict_key]
+    except IndexError:
+      # There were no records in the latest collection.
+      # A KeyError here indicates something more serious.
+      old_calibration_dict = None
+
+
+    if not old_calibration_dict == calibration_dict:
+      syslog.syslog(syslog.LOG_INFO, "db: Calibration changed. Saving new calibration in database.")
+      self.calibration_latest_collection.replace_one(
+        {"_id": 0},  # this ensures that calibrationParams will only have one value.
+        {calibration_dict_key: calibration_dict},
+        upsert = True
+      )
+      self.calibration_history_collection.insert_one({"timestamp" : timestamp, calibration_dict_key: calibration_dict})
 
 
   ############
@@ -195,23 +215,6 @@ class DatabaseManager(object):
   def query_dummy(self):
     import random
     return random.randint(0, 1024)
-
-  #TODO
-  # this function queries the latest calibration parameters from the appropriate table 
-  # should be used only on startup 
-  def query_latest_calibration(self):
-    # see https://stackoverflow.com/questions/22200587/get-records-for-the-latest-timestamp-in-sqlite
-    c = self._conn.cursor()
-    c.execute("SELECT * FROM ??? ORDER BY timestamp DESC LIMIT 1")
-    query_result = c.fetchall()
-    return query_result
-
-  # TODO
-  # store updated calibration settings in to the appropriate table
-  def update_calibration(self, timestamp, calibration_dict):
-    c = self._conn.cursor()
-    c.execute("INSERT (?, ?) INTO TABLE ... ??? ", timestamp, calibration_dict)
-    c.commit()
 
 # necessary?
 class DBException(Exception):
