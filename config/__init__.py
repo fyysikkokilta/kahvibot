@@ -20,8 +20,8 @@ _CONFIG_DEFAULTS = {
 
       "calibration" : {
         "max_ncups" : 10.0,
-        "coffee_full_value" = 1024,
-        "coffee_empty_decanter_value" = 100,
+        "coffee_full_value" : 1024,
+        "coffee_empty_decanter_value" : 100,
       },
 
       "database" : {
