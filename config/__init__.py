@@ -19,9 +19,9 @@ _CONFIG_DEFAULTS = {
       },
 
       "calibration" : {
-        "sensor_min_value" : 0,
-        "sensor_max_value" : 1024,
         "max_ncups" : 10.0,
+        "coffee_full_value" = 1024,
+        "coffee_empty_decanter_value" = 100,
       },
 
       "database" : {
