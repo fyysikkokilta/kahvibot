@@ -234,6 +234,28 @@ class KahviBot():
       self.reply_plot(chat_id, msg_from, reply_to)
       return
 
+    if command == "/help": # or command == "/start": #TODO
+      self.reply_help(chat_id, msg_from, reply_to = reply_to)
+      return
+
+  """
+  Reply to the user with a help text.
+  """
+  def reply_help(self, chat_id, msg_from, reply_to = None, lang = "fi"):
+    #TODO: language support....
+    help_txt = """Komennot:
+/status - Kerro kahvin määrä kiltiksellä tällä hetkellä.
+/plot - Näytä kahvin määrä kiltiksellä viimeisen tunnin ajalta.
+/help - Näytä tämä viesti.
+
+Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla parannusehdotus? Ota yhteyttä ylläpitäjään {}.""".format(self.admin)
+
+    self.send_and_log(chat_id, msg_from, help_txt,
+                      log_msg = "sent help message to {}.",
+                      reply_to_message_id = reply_to
+                      )
+    pass
+
   """
   This function gets called if an user has asked for the amount of coffee in
   the coffee maker right now. It figures out the amount of coffee and sends the
