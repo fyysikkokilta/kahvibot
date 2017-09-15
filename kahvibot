@@ -85,12 +85,14 @@ class KahviBot():
     msg_from: the dictionary given by Telepot.Message["from"]
     message: The message content to send.  Can be e.g. text or an image file
       handle.
-    send_fun: the function to use for sending (i.e. bot.sendMessage or
+    log_msg: The string that will be printed to the syslog. If it includes '{}',
+      the recipient will be added to itusing str.format().
+    send_fun: The function to use for sending (i.e. bot.sendMessage or
       bot.sendPhoto). Default is self.bot.sendMessage (text)
     **kwargs: these are passed onto send_fun
   """
-  def send_and_log(self, chat_id, msg_from, message, send_fun = None,
-                   **kwargs):
+  def send_and_log(self, chat_id, msg_from, message, log_msg = None,
+                   send_fun = None, **kwargs):
     first = last = uname = ""
 
     if send_fun is None:
@@ -109,29 +111,34 @@ class KahviBot():
     except KeyError:
       pass
 
-
     send_fun(chat_id, message, **kwargs)
 
-    log_msg = "kahvibot: sent "
-    if send_fun == self.bot.sendMessage:
-      log_msg += "text "
-    elif send_fun == self.bot.sendPhoto:
-      log_msg += "photo "
+    if log_msg is None:
+      log_msg = "sent "
+      if send_fun == self.bot.sendMessage:
+        log_msg += "text "
+      elif send_fun == self.bot.sendPhoto:
+        log_msg += "photo "
 
-    log_msg += "message to "
+      log_msg += "message to {}."
+
+    # the string to be insterted into log_msg format
+    log_msg_recipient = ""
     if first:
-      log_msg += first + " "
+      log_msg_recipient += first + " "
     if last:
-      log_msg += last + " "
+      log_msg_recipient += last + " "
     if uname:
-      log_msg += "({}) ".format(uname)
+      log_msg_recipient += "({}) ".format(uname)
 
-    log_msg = log_msg.strip()
+    log_msg_recipient = log_msg_recipient.strip()
 
     if first or last or uname:
-      log_msg += ","
+      log_msg_recipient += ","
 
-    log_msg += " chat ID {}.".format(chat_id)
+    log_msg_recipient += " chat ID {}".format(chat_id)
+
+    log_msg = "kahvibot: " + log_msg.format(log_msg_recipient)
 
     syslog.syslog(syslog.LOG_INFO, log_msg)
 
@@ -258,7 +265,9 @@ class KahviBot():
         #  # TODO: reset this counter when new coffee has been made
         #  self.no_asked_for_coffee += 1
 
-    self.send_and_log(chat_id, msg_from, reply, reply_to_message_id = reply_to)
+    self.send_and_log(chat_id, msg_from, reply,
+                      log_msg =  "sent amount of coffee to {}.",
+                      reply_to_message_id = reply_to)
 
 
   """
@@ -315,7 +324,9 @@ class KahviBot():
 
       f.seek(0)
 
-      self.send_and_log(chat_id, msg_from, f, send_fun = self.bot.sendPhoto,
+      self.send_and_log(chat_id, msg_from, f,
+                        log_msg = "sent plot to {}.",
+                        send_fun = self.bot.sendPhoto,
                         reply_to_message_id = reply_to)
 
     # close the figure to not take up memory.
