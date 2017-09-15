@@ -222,8 +222,7 @@ class KahviBot():
     if isGroup:
       reply_to = msg["message_id"]
 
-    if ("kahvi" in text or
-        "tsufe" in text or # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
+    if ("kahvi" in text or #"tsufe" in text or # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
         #TODO: ("tsufe" in text and bot_name not in text) or something...
         command == "/status"
         ):
