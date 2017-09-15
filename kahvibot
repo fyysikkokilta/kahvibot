@@ -45,6 +45,14 @@ class KahviBot():
     bot_token = telegram_config["bot_token"]
     if not bot_token:
       raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
+
+    try:
+      self.admin = telegram_config["admin_username"]
+    except KeyError:
+      raise ValueError("Telegram bot administrator not provided in config.")
+    if not self.admin[0] == "@":
+      raise ValueError("Invalid admin username.")
+
     self.bot_token = bot_token
     self.bot = telepot.Bot(self.bot_token)
 
