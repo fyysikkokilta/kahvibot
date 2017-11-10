@@ -188,7 +188,7 @@ class KahviBot():
     reply_to = None
     bot = self.bot
 
-    isGroup = chat_type == "group"
+    isGroup = chat_type in ["group", "supergroup"]
 
     if content_type != "text":
       return
