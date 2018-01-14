@@ -139,12 +139,17 @@ class DatabaseManager(object):
 
     if not old_calibration_dict == calibration_dict:
       syslog.syslog(syslog.LOG_INFO, "db: Calibration changed. Saving new calibration in database.")
+      #syslog.syslog(syslog.LOG_DEBUG,
+      #    "db: (old calibration: {}, new calibration: {})".format(old_calibration_dict, calibration_dict))
+
       self.calibration_latest_collection.replace_one(
         {"_id": 0},  # this ensures that calibrationParams will only have one value.
-        {calibration_dict_key: calibration_dict},
+        {"_id": 0, calibration_dict_key: calibration_dict},
         upsert = True
       )
       self.calibration_history_collection.insert_one({"timestamp" : timestamp, calibration_dict_key: calibration_dict})
+    else:
+      syslog.syslog(syslog.LOG_INFO, "db: Calibration parameters not changed.")
 
 
   ############
