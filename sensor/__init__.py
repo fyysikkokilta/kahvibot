@@ -1,5 +1,5 @@
 """
-The package 'sensor' is responsible for handling sensor input i.e. reading the 
+The package 'sensor' is responsible for handling sensor input i.e. reading the
 FSR and calculating the number of coffee cups based on the calibration defined
 in the configuration files.
 
@@ -8,7 +8,8 @@ Needs to be run as root to access the GPIO pins.
 
 
 import time, os, sys, syslog
-from math import sqrt
+#from math import sqrt
+from statistics import stdev, mean, median
 try:
   import config
 except ImportError:
@@ -52,8 +53,8 @@ class Sensor():
   """
   The function that returns the sensor value after averaging,
   this is supposed to be called externally.
-  Returns: a dictionary containing the averaged raw sensor value and the no. of
-  cups we have determined to be in the coffee machine.
+  Returns: a dictionary containing the averaged raw sensor value and the
+  current no. of cups we have determined to be in the coffee machine.
   """
   def poll(self, averaging_time = None, avg_interval = 0.01):
     if not averaging_time:
@@ -70,15 +71,24 @@ class Sensor():
       time.sleep(avg_interval)
 
 
-    s = sum(datapoints)
+    #s = sum(datapoints)
     n = len(datapoints)
+    #raw_value = s / n
 
-    raw_value = s / n
+    # apply median filtering (NOTE: doesn't work if the erroneous result is at the edge...
+    datapoints.insert(0, datapoints[0])
+    datapoints.append(datapoints[-1])
+    datapoints = [median(datapoints[i:i+3]) for i in range(len(datapoints) - 2)]
+
+    raw_value = mean(datapoints)
 
     # standard deviation
-    std = sqrt(sum([(x - raw_value) ** 2 for x in datapoints]) / (n - 1))
+    #std = sqrt(sum([(x - raw_value) ** 2 for x in datapoints]) / (n - 1))
+    std = stdev(datapoints, raw_value)
 
     nCups = self.compute_nCups(raw_value)
+
+    result = {}
 
     #TODO: CLEAR UP THIS HACKY MESS
 
@@ -96,18 +106,29 @@ class Sensor():
     if nCups is None:
       nCups = 0.
 
+    coffeeComing = False
+    max_nCups = float(self.calibration["max_ncups"])
+    if nCups / max_nCups > 1.2: #TODO: make this magic number configurable?
+      # Simple method of detecting whether coffee is being made.
+      # Assuming that the scale is at the back of the coffee maker, which means
+      # that coffee is coming if the computed no. of cups exceeds the maximum.
+      coffeeComing = True
+
+    nCups = max(min(nCups, max_nCups), 0)
+
     relative_std = std / abs(raw_value)
     if relative_std > 0.5:
       syslog.syslog(syslog.LOG_WARNING,
           "sensor: unusually high std. raw_value: {raw_value}, n: {n}, std: {std} (relative: {relative_std:.2f})".format(**locals()))
+      result["datapoints"] = datapoints[:] # store datapoints to investigate high stds...
 
-    result = {}
 
     result["rawValue"] = raw_value
     result["nMeasurements"] = n
     result["std"] = std
     result["nCups"] = nCups
     result["isCoffee"] = isCoffee
+    result["coffeeComing"] = coffeeComing
     result["trayEmpty"] = trayEmpty
 
     return result
@@ -140,12 +161,12 @@ class Sensor():
       full_val = float(cal["coffee_full_value"])
       max_nCups = float(cal["max_ncups"])
       nCups = (raw_value - empty_val) / (full_val - empty_val) * max_nCups
-      if nCups > max_nCups or nCups < 0:
-        #TODO: check these manually...
-        #syslog.syslog(syslog.LOG_WARNING, "sensor: incorrect nCups value: {nCups} (raw_value: {raw_value}, empty_val: {empty_val}, full_val: {full_val}, max_nCups: {max_nCups})".format(**locals()))
-        pass
 
-      nCups = max(min(max_nCups, nCups), 0.)
+      ##TODO: make this magic number configurable???
+      #if nCups / max_nCups >= 1.2:
+      #  pass
+
+      #nCups = max(min(max_nCups, nCups), 0.)
 
       return nCups
 
