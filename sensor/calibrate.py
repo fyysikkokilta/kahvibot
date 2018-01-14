@@ -59,4 +59,4 @@ if __name__ == "__main__":
 
   print("Finished. Your calibration parameters are:")
   for k, v in calibration.items():
-    print("{}: {} (std: {})".format(k, v[0], v[1]))
+    print("{}: {} (std: {} ({} %))".format(k, v[0], v[1], v[1] /v[0] * 100))
