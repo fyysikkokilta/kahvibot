@@ -13,13 +13,16 @@ import telepot.loop
 import config, db
 import sys, time, syslog, signal
 
+#TODO: remove / clean up
+import cv2
+import tempfile
+
 try:
   import matplotlib
   matplotlib.use("Agg") # has to be before other matplotlib imports to enable "headlessness"
   import matplotlib.pyplot as plt
   from matplotlib.dates import DateFormatter
   import datetime
-  import tempfile
 except ImportError:
   # mark that matplotlib is not available
   plt = False
@@ -71,6 +74,11 @@ class KahviBot():
     # TODO: separate functions for handling message types
     # see: https://telepot.readthedocs.io/en/latest/reference.html#message-loop-and-webhook
     #telepot.loop.MessageLoop(self.bot, {"chat": self.handle_chat_message, "group": self.handle_group_message).run_as_thread()
+
+    #TODO: remove
+    syslog.syslog(syslog.LOG_INFO, "kahvibot: initializing webcamera")
+    self.camera = cv2.VideoCapture("/dev/video0")
+    for i in range(50): self.camera.grab()
 
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
 
@@ -228,8 +236,10 @@ class KahviBot():
         command == "/status"
         ):
 
-      self.reply_current_coffee_amount(chat_id, msg_from, reply_to)
-      return
+      #TODO: implement
+      #self.reply_current_coffee_amount(chat_id, msg_from, reply_to)
+      #return
+      command = "/totuus"
 
     if command == "/plot":
       self.reply_plot(chat_id, msg_from, reply_to)
@@ -237,6 +247,10 @@ class KahviBot():
 
     if command == "/help": # or command == "/start": #TODO
       self.reply_help(chat_id, msg_from, reply_to = reply_to)
+      return
+
+    if command == "/totuus":
+      self.reply_current_coffee_picture(chat_id, msg_from, reply_to)
       return
 
   """
@@ -298,6 +312,47 @@ Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla
     self.send_and_log(chat_id, msg_from, reply,
                       log_msg =  "sent amount of coffee to {}.",
                       reply_to_message_id = reply_to)
+
+  """
+  Send a picture taken using the web camera.
+  """
+  def reply_current_coffee_picture(self, chat_id, msg_from, reply_to):
+    error_msg = "Mittausdataa ei valitettavasti ole saatavilla."
+
+    self.bot.sendChatAction(chat_id, "typing")
+
+    with tempfile.NamedTemporaryFile(suffix = ".jpg") as f:
+      #cap = cv2.VideoCapture("/dev/video0") #TODO: take picture from db instead of directly using opencv here...
+      # flush camera buffer
+      #t = time.time()
+      for i in range(10): self.camera.grab()
+      ret, img = self.camera.read()
+      #while time.time() - t < 0.05: # very hacky way to flush buffer....
+      #  t = time.time()
+      #  ret, img = self.camera.read()
+
+      if not ret or img is None:
+        # taking picture failed
+        self.send_and_log(chat_id, msg_from, error_msg, reply_to_message_id = reply_to)
+        f.close()
+        return
+
+      ret = cv2.imwrite(f.name, img)
+
+      if not ret:
+        # writing image to temp file failed
+        self.send_and_log(chat_id, msg_from, error_msg, reply_to_message_id = reply_to)
+        f.close()
+        return
+
+      f.seek(0)
+
+      self.send_and_log(chat_id, msg_from, f,
+                        log_msg = "sent image to {}.",
+                        send_fun = self.bot.sendPhoto,
+                        reply_to_message_id = reply_to)
+
+      f.close()
 
 
   """
@@ -369,6 +424,9 @@ Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla
   """
   def handle_sigterm(self, *kwargs):
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Exiting.")
+
+    #TODO
+    self.camera.release()
 
     sys.exit(0)
 
