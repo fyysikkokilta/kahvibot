@@ -61,6 +61,6 @@ Steps mostly based on [this tutorial](https://www.pyimagesearch.com/2016/04/18/i
    >>> cv2.__version__
    ```
 
-1. Finally, clean up the folders to free up storage space: `cd .. rm -r opencv*` and you're done. (Note: this breaks C++ error messages but what are you gonna do.)
+1. Finally, clean up the folders to free up storage space: `cd .. && rm -r opencv*` and you're done. (Note: this breaks C++ error messages but what are you gonna do.)
 
 **TODO**: info on calibration etc
