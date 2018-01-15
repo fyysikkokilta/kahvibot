@@ -5,11 +5,11 @@
 
 ## Installing OpenCV on a Raspberry Pi
 
-**NOTE**: This might change if a Python 3-compatible OpenCV package is released for Raspbian. Then it should be just `sudo apt install python3-opencv` or something. But for now, OpenCV must be compiled from source.
+**NOTE**: This might change if a Python 3-compatible OpenCV package is released for Raspbian. Then it should be just `sudo apt install python3-opencv` or something like that. But for now, OpenCV must be compiled from source.
 
 Steps mostly based on [this tutorial](https://www.pyimagesearch.com/2016/04/18/install-guide-raspberry-pi-3-raspbian-jessie-opencv-3/), with slight modifications in e.g. compiler flags.
 
-1. Install dependencies: `sudo apt install build-essential cmake pkg-config`.
+1. Install dependencies: `sudo apt install build-essential cmake pkg-config`. Note: we're not installing using a virtual environment as in the tutorial (this might not be a good idea).
 1. Install  I/O packages:
 
    `sudo apt install libjpeg-dev libtiff5-dev libjasper-dev libpng12-dev`
@@ -23,12 +23,11 @@ Steps mostly based on [this tutorial](https://www.pyimagesearch.com/2016/04/18/i
    `cd <working_directory> && mkdir opencv && cd opencv`
 
    ```
-   wget -O opencv_contrib-3.4.0.zip https://github.com/opencv/opencv_contrib/archive/3.4.0.zip`
+   wget -O opencv_contrib-3.4.0.zip https://github.com/opencv/opencv_contrib/archive/3.4.0.zip
    wget -O opencv-3.4.0.zip https://github.com/opencv/opencv/archive/3.4.0.zip
    unzip opencv-3.4.0.zip && unzip opencv_contrib-3.4.0.zip
    ```
 
-1. Note: we're not installing using a virtual environment as in the tutorial (this might not be a good idea). We assume here that `pip3` is installed.
 1. Set compiler flags and compile:
 
    `cd opencv-3.4.0 && mkdir build && cd build`
@@ -47,7 +46,7 @@ Steps mostly based on [this tutorial](https://www.pyimagesearch.com/2016/04/18/i
 
    Check the CMake output that the Python 3 interpreter is set corrcetly.
 
-   Compile using 3 threads: `make -j3` (this is the longest step). If the installation gets stuck at the end, try `make clean` and then `make` to compile with just a single thread. After this is done,
+   Compile using 3 threads: `make -j3` (this is the longest step, more than an hour). If the installation gets stuck at the end, try `make clean` and then `make` to compile with just a single thread. After this is done,
 
    `sudo make install && sudo ldconfig`
 
