@@ -13,6 +13,7 @@ Steps mostly based on [this tutorial](https://www.pyimagesearch.com/2016/04/18/i
 1. Install  I/O packages:
 
    `sudo apt install libjpeg-dev libtiff5-dev libjasper-dev libpng12-dev`
+
    `sudo apt install libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev` (might not be necessary but just in case)
 
 1. Install matrix operation libraries to improve performance: `sudo apt install libatlas-base-dev gfortran`
