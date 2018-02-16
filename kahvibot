@@ -13,7 +13,7 @@ import telepot.loop
 import config, db
 import sys, time, syslog, signal
 
-#TODO: remove / clean up
+#TODO: remove when applicable
 import cv2
 import tempfile
 
@@ -35,7 +35,7 @@ class KahviBot():
   def __init__(self, config_dict = None):
 
     if config_dict is None:
-      self.config_dict = config.get_config_dict()
+      config_dict = config.get_config_dict()
 
     telegram_config = config_dict["telegram"]
 
@@ -81,6 +81,19 @@ class KahviBot():
     syslog.syslog(syslog.LOG_INFO, "kahvibot: initializing webcamera")
     self.camera = cv2.VideoCapture("/dev/video0")
     for i in range(50): self.camera.grab()
+
+    # TODO: move this to sensor
+    self.watermark = None
+    try:
+      self.watermark = cv2.imread(
+          config_dict["telegram"]["watermark_file"],
+          cv2.IMREAD_UNCHANGED # read alpha channel also
+          )
+      if self.watermark is None:
+        raise KeyError
+
+    except KeyError as e:
+      syslog.syslog(syslog.LOG_INFO, "kahvibot: watermark not found")
 
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
 
@@ -361,6 +374,31 @@ Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla
         self.send_and_log(chat_id, msg_from, error_msg, reply_to_message_id = reply_to)
         f.close()
         return
+
+      # add watermark
+      # TODO: move to sensor driver
+      if self.watermark is not None:
+        try:
+          wm = self.watermark
+          assert wm.shape[-1] == 4 # check alpha channel
+
+          offset_xy = (10, 10) # offset measured from top right corner
+
+          wh, ww = wm.shape[:2] # watermark dimensions
+          x1, x2 = -(ww + offset_xy[0]), -offset_xy[0]
+          y1, y2 = offset_xy[1], wh + offset_xy[1]
+
+          # normalized alpha channel
+          a = (wm[..., -1] / 255.0)[..., None] # None == np.newaxis, makes shape correct
+
+          # imprint watermark
+          img[y1:y2, x1:x2] = a * wm[..., :3] + (1 - a) * img[y1:y2, x1:x2]
+
+        except AssertionError:
+          syslog.syslog(syslog.LOG_DEBUG,
+              "kahvibot: no alpha channel found in watermark"
+              )
+
 
       ret = cv2.imwrite(f.name, img)
 
