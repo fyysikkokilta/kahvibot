@@ -66,6 +66,8 @@ class KahviBot():
       syslog.syslog(syslog.LOG_WARNING, "kahvibot: Plotting not available.")
 
     self.data_unavailable_threshold = float(telegram_config["data_unavailable_threshold"])
+    self.group_trigger_threshold = int(telegram_config["group_trigger_threshold"])
+    self.group_sizes = dict() # dict containing sizes of groups
 
     # flush messages on startup.
     self.flush_messages()
@@ -198,6 +200,14 @@ class KahviBot():
 
     isGroup = chat_type in ["group", "supergroup"]
 
+    if content_type in [
+        "new_chat_member",
+        "left_chat_member",
+        "new_chat_members",
+        ]:
+      # update group size
+      self.group_sizes[chat_id] = bot.getChatMembersCount(chat_id)
+
     if content_type != "text":
       return
 
@@ -226,9 +236,17 @@ class KahviBot():
       else:
         command = None
 
-    # if we are in a group, reply to the person who sent the command
+    group_size = 0
     if isGroup:
+      # if we are in a group, reply to the person who sent the command
       reply_to = msg["message_id"]
+
+      # figure out group size
+      if not chat_id in self.group_sizes:
+        group_size = bot.getChatMembersCount(chat_id)
+        self.group_sizes[chat_id] = group_size
+      else:
+        group_size = self.group_sizes[chat_id]
 
     # TODO: make not hardcoded?
     trigger_words = [
@@ -238,7 +256,7 @@ class KahviBot():
         ]
     trigger_word_found = any(w in text.lower() for w in trigger_words)
 
-    if (trigger_word_found
+    if ((trigger_word_found and group_size <= self.group_trigger_threshold)
         or
         command == "/status"
         ):
