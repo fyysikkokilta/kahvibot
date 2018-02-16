@@ -1,4 +1,6 @@
 # kiltiskahvi
+NOTE: this branch doesn't require `cv2`, measurements are only based on the scale
+
 ## What?
 Software for tracking the amount of coffee at the [Guild of Physics](http://www.fyysikkokilta.fi/) guild room, mostly written in Python.
 The system consists of essentially three parts:
