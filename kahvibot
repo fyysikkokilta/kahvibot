@@ -86,7 +86,7 @@ class KahviBot():
     self.watermark = None
     try:
       self.watermark = cv2.imread(
-          config_dict["telegram"]["watermark_file"],
+          telegram_config["watermark_file"],
           cv2.IMREAD_UNCHANGED # read alpha channel also
           )
       if self.watermark is None:
@@ -390,6 +390,7 @@ Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla
 
           # normalized alpha channel
           a = (wm[..., -1] / 255.0)[..., None] # None == np.newaxis, makes shape correct
+          a *= 0.5 # make watermark translucent TODO: make configurable?
 
           # imprint watermark
           img[y1:y2, x1:x2] = a * wm[..., :3] + (1 - a) * img[y1:y2, x1:x2]
