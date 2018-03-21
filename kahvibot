@@ -69,14 +69,6 @@ class KahviBot():
     self.group_trigger_threshold = int(telegram_config["group_trigger_threshold"])
     self.group_sizes = dict() # dict containing sizes of groups
 
-    # flush messages on startup.
-    self.flush_messages()
-
-    telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
-    # TODO: separate functions for handling message types
-    # see: https://telepot.readthedocs.io/en/latest/reference.html#message-loop-and-webhook
-    #telepot.loop.MessageLoop(self.bot, {"chat": self.handle_chat_message, "group": self.handle_group_message).run_as_thread()
-
     #TODO: remove
     syslog.syslog(syslog.LOG_INFO, "kahvibot: initializing webcamera")
     self.camera = cv2.VideoCapture("/dev/video0")
@@ -95,6 +87,14 @@ class KahviBot():
     except KeyError as e:
       syslog.syslog(syslog.LOG_INFO, "kahvibot: watermark not found")
 
+    # flush messages on startup.
+    self.flush_messages()
+
+    telepot.loop.MessageLoop(self.bot, self.handle_message).run_as_thread()
+    # TODO: separate functions for handling message types
+    # see: https://telepot.readthedocs.io/en/latest/reference.html#message-loop-and-webhook
+    #telepot.loop.MessageLoop(self.bot, {"chat": self.handle_chat_message, "group": self.handle_group_message).run_as_thread()
+
     syslog.syslog(syslog.LOG_INFO, "kahvibot: Listening for Telegram messages.")
 
   """
@@ -103,10 +103,10 @@ class KahviBot():
   # TODO: notify users if their messages were flushed...
   def flush_messages(self):
     updates = self.bot.getUpdates()
-    if updates:
+    while updates:
       syslog.syslog(syslog.LOG_INFO, "kahvibot: Flushing {} messages.".format(len(updates)))
       # we assume that between here there's been no messages...
-      self.bot.getUpdates(updates[-1]["update_id"] + 1)
+      updates = self.bot.getUpdates(updates[-1]["update_id"] + 1)
 
   """
   Send a message and log it to the syslog.
@@ -265,6 +265,7 @@ class KahviBot():
     trigger_words = [
         "kahvi",
         "\u2615",
+        "kahavi",
         #"tsufe" in text or # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
         ]
     trigger_word_found = any(w in text.lower() for w in trigger_words)
