@@ -39,6 +39,3 @@ Mostly as a reminder for myself how the system is set up.
 
 ### Configuration, calibration
 **TODO**
-
-# Hardware setup
-If you're using an MCP3008 ADC to read out your sensor, adjust your wiring and the pinouts in `sensor/drivers/adafruit_mcp3008` to match. Otherwise, you can write your own driver for ADC readout, see the README in `sensor/drivers/` for instructions.
