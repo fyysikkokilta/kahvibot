@@ -1,25 +1,21 @@
 # kiltiskahvi - computer vision edition
 ## What?
 Software for tracking the amount of coffee at the [Guild of Physics](http://www.fyysikkokilta.fi/) guild room, mostly written in Python.
-The system consists of essentially three parts:
+The system consists of essentially ~~three~~ two parts:
 * A script that continuously measures the amount of coffee with a webcamera and stores the measurements in a database
 * A Telegram bot that tells how much coffee there is when asked
-* Web software for displaying how the amount of coffee varies over time on a website
+* ~~Web software for displaying how the amount of coffee varies over time on a website~~ - this is scrapped for now, but might be implemented in the future
 
-The first two of these are run on a Raspberry Pi, while the web software is hosted elsewhere and then whitelisted on said Pi to allow database queries.
+The scripts are run on a Raspberry Pi at the guild room.
 
 
 ## How?
-The telegram bot will most likely be based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) or possibly [telepot](https://github.com/nickoala/telepot).
+The telegram bot is made using [telepot](https://github.com/nickoala/telepot).
 Instead of storing full images, the amount of coffee is determined from a picture using [OpenCV](https://opencv.org/).
-Data will be served in JSON by [Flask](http://flask.pocoo.org/) to a whitelisted server. The graphing will most likely be done using [Highstock](http://www.highcharts.com/products/highstock).
-The database is handled by MongoDB using [PyMongo](https://api.mongodb.com/python/current/).
+The database is handled by MongoDB with [PyMongo](https://api.mongodb.com/python/current/).
 
 ## Why?
 Because.
-
-## When?
-Soon™
 
 ## Usage
 Mostly as a reminder for myself how the system is set up.
@@ -35,11 +31,7 @@ Mostly as a reminder for myself how the system is set up.
 1. Run `sudo service kiltiskahvi start` to start the coffee measurement daemon. Check the syslog to see that it's working (or if it's not).
 1. Run `sudo systemctl enable kiltiskahvi` to make it also start on boot
 1. Insert your telegram [bot token](https://core.telegram.org/bots#generating-an-authorization-token) in the configuration file in `config/config.ini`
-1. Start the telegram bot service: `sudo systemctl enable kahvibot && sudo service kahvibot start`
-1. Clone the repo or download the contents of the folder `web/` to your desired location on your webserver.
-1. Download [highstock](http://www.highcharts.com/download), navigate to the folder `js` and copy the files `highstock.js` and `modules/exporting.js` to `web/lib/` or wherever you copied the contents of `web` to
-1. Set up the `config` file in said folder according to the instructions in `config.default`
-1. Expose the `web` folder on your server and you're good to go, assuming your firewall settings are correct.
+1. Start the telegram bot service: `sudo systemctl enable kahvibot && sudo service kahvibot start` and you should be good to go.
 
 ### Running
 **TODO**
