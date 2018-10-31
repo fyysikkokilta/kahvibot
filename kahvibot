@@ -266,7 +266,8 @@ class KahviBot():
         "kahvi",
         "\u2615",
         "kahavi",
-        #"tsufe" in text or # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
+        #"sima", # wappu mode
+        #"tsufe", # NOTE: in the case of tsufeBot, this may trigger even if the bot is only tagged, good idea?
         ]
     trigger_word_found = any(w in text.lower() for w in trigger_words)
 
@@ -383,15 +384,19 @@ Onko raportoitu kahvin määrä väärin? Onko jokin muu pielessä? Onko sinulla
           wm = self.watermark
           assert wm.shape[-1] == 4 # check alpha channel
 
-          offset_xy = (10, 10) # offset measured from top right corner
+          offset_xy = (0, 0) # offset measured from top right corner
 
           wh, ww = wm.shape[:2] # watermark dimensions
-          x1, x2 = -(ww + offset_xy[0]), -offset_xy[0]
-          y1, y2 = offset_xy[1], wh + offset_xy[1]
+          if wm.shape[:2] != img.shape[:2]:
+            x1, x2 = -(ww + offset_xy[0]), -offset_xy[0]
+            y1, y2 = offset_xy[1], wh + offset_xy[1]
+          else:
+            x1, y1 = (0, 0)
+            y2, x2 = img.shape[:2]
 
           # normalized alpha channel
           a = (wm[..., -1] / 255.0)[..., None] # None == np.newaxis, makes shape correct
-          a *= 0.5 # make watermark translucent TODO: make configurable?
+          #a *= 0.5 # make watermark translucent TODO: make configurable?
 
           # imprint watermark
           img[y1:y2, x1:x2] = a * wm[..., :3] + (1 - a) * img[y1:y2, x1:x2]
