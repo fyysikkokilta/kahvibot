@@ -21,14 +21,21 @@ class DBManager():
     self.data = self.db["data"]
 
   def get_label_count(self):
-    # https://docs.mongodb.com/manual/reference/operator/aggregation/size/
-    agg = dbm.data.aggregate([
-      # https://stackoverflow.com/questions/14789684/find-mongodb-records-where-array-field-is-not-empty
-      #{"$project": $ne: [] ... }, #TODO
-      { "$project": { "count_l": {"$size" : "$right"}}
-       },
-      #TODO { ... sum ... }
-      ])
+    # return an empty list on aggregation if left/right doesn't exist
+    def ifn(s): return {"$ifNull": [ s, [] ]}
+
+    agg = self.data.aggregate([{
+      "$project": {
+        "count": {
+          "$sum": [
+            {"$size": ifn("$left" )},
+            {"$size": ifn("$right")},
+            ]
+        }
+      },
+      }])
+
+    return sum(map(lambda x: x["count"], agg))
 
   def get_unlabeled_items(self, all_filenames):
     #TODO: check left/right separately?

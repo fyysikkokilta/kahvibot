@@ -76,11 +76,12 @@ body {
 	</head>
 	<body>
 		<header>
-			<h1>Kuinka monta kupillista kahvia näet kuvassa?</h1>
+			<h1>Montako kupillista kahvia näet kuvassa?</h1>
 		</header>
 		<p>
-		Täysi pannu on kymmenen kuppia.
+		Täysi pannu on 10 kuppia.
     <!--Olet kategorioinut {{ n_images }} kuvaa. {% if n_images > 5 %} Hienoa! {% endif %} -->
+		Käyttäjät ovat luokitelleet {{ label_count }} kuvaa.
 		</p>
 		<div class="cropped"><img src="{{ image_to_label }}"></div>
 		<form method="post">

@@ -27,12 +27,16 @@ except FileNotFoundError as e:
 
 print("\ndata items without a label: {} / {}\n".format(len(dbm.get_unlabeled_items(all_filenames)), len(all_filenames)))
 
+label_count = dbm.get_label_count()
+print("label count: {}".format(label_count))
+
 SPAM_TIME = 0.3 # if an ip sends a message more often than this, it is spam.
 
 visitors = {} # a map ip-address: timestamp, to prevent spam
 
 @app.route("/kahvi", methods=["GET", "POST"])
 def root():
+  global label_count
 
   ip = request.remote_addr
   timestamp = time.time()
@@ -63,6 +67,7 @@ def root():
 
       print("inserting {}: {} ({}) - {}".format(fname, value, side, ip))
       dbm.add_entry(fname, side, value, timestamp)
+      label_count += 1
 
       return redirect(url_for("root"))
 
@@ -85,6 +90,7 @@ def root():
       example_empty_url = url_for("static", filename = "/img/example_empty.jpg"),
       n_images = n_images,
       side = side, # this is for cropping the image, remove if unnecessary
+      label_count = label_count,
       )
 
 if __name__ == "__main__":
