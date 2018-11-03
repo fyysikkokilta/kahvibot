@@ -25,7 +25,6 @@ try:
 except FileNotFoundError as e:
   raise FileNotFoundError("Could not find images to be labelled in folder {}.".format(DATA_FOLDER)) from e
 
-# helper functions
 print("\ndata items without a label: {} / {}\n".format(len(dbm.get_unlabeled_items(all_filenames)), len(all_filenames)))
 
 SPAM_TIME = 0.3 # if an ip sends a message more often than this, it is spam.
@@ -87,3 +86,6 @@ def root():
       n_images = n_images,
       side = side, # this is for cropping the image, remove if unnecessary
       )
+
+if __name__ == "__main__":
+  app.run(host = "0.0.0.0", port = 80)

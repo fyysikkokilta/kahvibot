@@ -31,6 +31,7 @@ class DBManager():
       ])
 
   def get_unlabeled_items(self, all_filenames):
+    #TODO: check left/right separately?
     filenames_in_db = { x["filename"] for x in self.data.find(projection = {"filename": True})}
     return list(set(all_filenames) - filenames_in_db)
 
