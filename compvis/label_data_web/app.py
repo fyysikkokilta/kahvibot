@@ -19,7 +19,11 @@ dbm = DBManager(DATABASE_NAME)
 app = Flask(__name__, template_folder = ".", static_url_path = "", static_folder = ".")
 
 DATA_FOLDER = "img/data"
-all_filenames = os.listdir(DATA_FOLDER)
+try:
+  all_filenames = os.listdir(DATA_FOLDER)
+  assert len(all_filenames) > 0, "Folder {} was empty.".format(DATA_FOLDER)
+except FileNotFoundError as e:
+  raise FileNotFoundError("Could not find images to be labelled in folder {}.".format(DATA_FOLDER)) from e
 
 # helper functions
 print("\ndata items without a label: {} / {}\n".format(len(dbm.get_unlabeled_items(all_filenames)), len(all_filenames)))
