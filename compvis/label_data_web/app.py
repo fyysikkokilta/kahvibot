@@ -78,6 +78,8 @@ def root():
 
   return render_template("label-data.html",
       image_to_label = url_for("static", filename = data_path),
+      example_full_url = url_for("static", filename = "/img/example_full.jpg"),
+      example_empty_url = url_for("static", filename = "/img/example_empty.jpg"),
       n_images = n_images,
       side = side, # this is for cropping the image, remove if unnecessary
       )
