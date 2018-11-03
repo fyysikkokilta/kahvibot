@@ -1,6 +1,6 @@
-# Crowdsource labeling
+# Crowdsourced labeling
 
-This folder contains a simple [flask](http://flask.pocoo.org/) app that allows
+This folder contains a simple [Flask](http://flask.pocoo.org/) app that allows
 easily labeling pictures of coffee pans in a web browser. By running it on a
 server, the task of labeling pictures can be easily crowd-sourced. The labels
 are stored in a MongoDB database and can be exported as JSON, see below.
@@ -13,4 +13,4 @@ are stored in a MongoDB database and can be exported as JSON, see below.
 1. Labels are stored in mongodb database determined by `DATABASE_NAME` in `app.py`, the default name is `coffeedata-labels`.
 
 The database can be exported as JSON by running
-`python3 utils.py --export` (**TODO**)
+`python3 utils.py --export`

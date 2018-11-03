@@ -61,5 +61,24 @@ class DBManager():
           upsert = True)
 
 def export_database(database_name):
-  raise NotImplementedError()
   import json
+  import time
+  dbm = DBManager(database_name)
+  items = list(dbm.data.find({}, {"_id": False}))
+  filename = "exported-data-{}.json".format(time.strftime("%Y%m%d-%H-%M-%S"))
+  with open(filename, "w") as f:
+    s = "[\n{}\n]".format(",\n".format([json.dumps(x) for x in items]))
+    f.write(s)
+    print("exported {} items to {}".format(len(items), filename))
+
+if __name__ == "__main__":
+  import argparse
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--export", dest="export") #TODO: this is incorrect
+  args = parser.parse_args()
+
+  if args.export:
+    from app import DATABASE_NAME
+    export_database(DATABASE_NAME)
+
