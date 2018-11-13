@@ -65,9 +65,10 @@ def export_database(database_name):
   import time
   dbm = DBManager(database_name)
   items = list(dbm.data.find({}, {"_id": False}))
+  print("exporting {} items".format(len(items)))
   filename = "exported-data-{}.json".format(time.strftime("%Y%m%d-%H-%M-%S"))
   with open(filename, "w") as f:
-    s = "[\n{}\n]".format(",\n".format([json.dumps(x) for x in items]))
+    s = "[\n{}\n]".format(",\n".join([json.dumps(x) for x in items]))
     f.write(s)
     print("exported {} items to {}".format(len(items), filename))
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
   import argparse
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--export", dest="export") #TODO: this is incorrect
+  parser.add_argument("--export", dest="export", action="store_true")
   args = parser.parse_args()
 
   if args.export:
