@@ -12,6 +12,7 @@ import telepot
 import telepot.loop
 import config, db
 import sys, time, syslog, signal
+import os
 
 #TODO: remove when applicable
 import cv2
@@ -77,8 +78,11 @@ class KahviBot():
     # TODO: move this to sensor
     self.watermark = None
     try:
+      # watermark file path is relative to script folder
+      watermark_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    telegram_config["watermark_file"])
       self.watermark = cv2.imread(
-          telegram_config["watermark_file"],
+          watermark_path,
           cv2.IMREAD_UNCHANGED # read alpha channel also
           )
       if self.watermark is None:
