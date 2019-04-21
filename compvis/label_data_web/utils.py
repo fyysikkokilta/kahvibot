@@ -93,7 +93,7 @@ def export_database(database_name):
   print("exporting {} items".format(len(items)))
   filename = "exported-data-{}.json".format(time.strftime("%Y%m%d-%H-%M-%S"))
   with open(filename, "w") as f:
-    s = "[\n{}\n]".format(",\n".join([json.dumps(x) for x in items]))
+    s = "[\n{}\n]".format(",\n".join([json.dumps(x, sort_keys = True) for x in items]))
     f.write(s)
     print("exported {} items to {}".format(len(items), filename))
 
