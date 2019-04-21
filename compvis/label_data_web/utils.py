@@ -24,18 +24,28 @@ class DBManager():
     # return an empty list on aggregation if left/right doesn't exist
     def ifn(s): return {"$ifNull": [ s, [] ]}
 
-    agg = self.data.aggregate([{
-      "$project": {
-        "count": {
-          "$sum": [
-            {"$size": ifn("$left" )},
-            {"$size": ifn("$right")},
-            ]
-        }
-      },
-      }])
+    # this works maybe with a newer version of mongo?
+    #agg = self.data.aggregate([{
+    #  "$project": {
+    #    "count": {
+    #      "$sum": [
+    #        {"$size": ifn("$left" )},
+    #        {"$size": ifn("$right")},
+    #        ]
+    #    }
+    #  },
+    #  }])
+    #
+    #return sum(map(lambda x: x["count"], agg))
 
-    return sum(map(lambda x: x["count"], agg))
+    agg = self.data.aggregate([{
+      "$group": {
+        "_id": "filename",
+        "count_l": { "$sum": {"$size": ifn("$left") } },
+        "count_r": { "$sum": {"$size": ifn("$right")} },
+        }
+      }])
+    return sum(map(lambda x: x["count_l"] + x["count_r"], agg))
 
   def get_unlabeled_items(self, all_filenames):
     #TODO: check left/right separately?
