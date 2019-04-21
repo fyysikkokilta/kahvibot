@@ -110,6 +110,7 @@ def root():
       n_images = n_images,
       side = side, # this is for cropping the image, remove if unnecessary
       label_count = label_count,
+      n_labeled_items = len(labeled_items["left"]) + len(labeled_items["right"]),
       )
 
 if __name__ == "__main__":

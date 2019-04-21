@@ -84,7 +84,7 @@ body {
 		<p>
 		Täysi pannu on 10 kuppia.
     <!--Olet kategorioinut {{ n_images }} kuvaa. {% if n_images > 5 %} Hienoa! {% endif %} -->
-		Käyttäjät ovat luokitelleet {{ label_count }} kuvaa.
+		Käyttäjät ovat luokitelleet {{ n_labeled_items }} kuvaa {{ label_count }} kertaa.
 		</p>
 		<div class="cropped"><img src="{{ image_to_label }}"></div>
 		<form method="post">
@@ -101,10 +101,10 @@ body {
 			<button name="choice" value="7">7</button>
 			<button name="choice" value="8">8</button>
 			<button name="choice" value="9">9</button>
-			<button name="choice" value="10">10</button>
+			<button name="choice" value="10" title="Pikanäppäin: +">10</button>
 			<br>
-			<button name="choice" value="-2">Pannu ei ole paikoillaan</button>
-			<button name="choice" value="-1">Kahvinkeitin ei ole näkyvissä / En osaa sanoa</button>
+			<button name="choice" value="-2" title="Pikanäppäin: q">Pannu ei ole paikoillaan</button>
+			<button name="choice" value="-1" title="Pikanäppäin: w">Kahvinkeitin ei ole näkyvissä / En osaa sanoa</button>
 		</form>
 		<div class="examples-container">
 		<div style="float: left;">
@@ -116,5 +116,20 @@ body {
 			<p> Esimerkki tyhjästä pannusta</p>
 		</div>
 		</div>
+	<script type="text/javascript">
+	document.onkeyup = function(e) {
+		const choices = Array.from(document.getElementsByName("choice"));
+		if(0 <= e.key && e.key <= 9) {
+			//console.log(e.key);
+			choices.find(c => c.value == e.key).click();
+		} else if (e.key == "+") {
+			choices.find(c => c.value == 10).click();
+		} else if (e.key == "q") {
+			choices.find(c => c.value == -2).click();
+		} else if (e.key == "w") {
+			choices.find(c => c.value == -1).click();
+		}
+	};
+	</script>
 	</body>
 </html>
