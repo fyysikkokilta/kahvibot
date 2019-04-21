@@ -25,7 +25,12 @@ try:
 except FileNotFoundError as e:
   raise FileNotFoundError("Could not find images to be labelled in folder {}.".format(DATA_FOLDER)) from e
 
-print("\ndata items without a label: {} / {}\n".format(len(dbm.get_unlabeled_items(all_filenames)), len(all_filenames)))
+labeled_items = dbm.get_labeled_items()
+unlabeled_items = dbm.get_unlabeled_items(all_filenames)
+print("\ndata items without a label: left: {}, right: {} / {}\n".format(
+  len(unlabeled_items["left"] ),
+  len(unlabeled_items["right"]),
+  len(all_filenames)))
 
 label_count = dbm.get_label_count()
 print("label count: {}".format(label_count))
@@ -69,6 +74,14 @@ def root():
       dbm.add_entry(fname, side, value, timestamp)
       label_count += 1
 
+      if fname in unlabeled_items[side]:
+        unlabeled_items[side].remove(fname)
+        labeled_items[side].add(fname)
+
+      print("unlabeled items: left: {}, right: {}".format(
+        len(unlabeled_items["left"]), len(unlabeled_items["right"])
+        ))
+
       return redirect(url_for("root"))
 
     else:
@@ -81,7 +94,13 @@ def root():
 
   side = random.choice(["left", "right"])
 
-  data_filename = random.choice(all_filenames)
+  data_filename = None
+  if unlabeled_items[side] and random.random() < 0.8:
+    # 80% chance to return image from unlabeled items
+    data_filename = random.choice(list(unlabeled_items[side]))
+  else:
+    data_filename = random.choice(all_filenames)
+
   data_path = os.path.join(DATA_FOLDER, data_filename)
 
   return render_template("label-data.html",
