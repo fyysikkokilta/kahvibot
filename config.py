@@ -47,13 +47,14 @@ def get_config_dict(filename = None):
 
 
 if __name__ == "__main__":
+    # test by running `python3 config.py`
+
     import argparse
     from pprint import pprint
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("-c", "--config",
-            dest = "config_file",
-            help = "use CONFIG_FILE as the configuration file instead of the default")
+    ap.add_argument("-c", "--config", dest="config_file",
+                    help="use CONFIG_FILE as the configuration file instead of the default")
 
     args = ap.parse_args()
 
