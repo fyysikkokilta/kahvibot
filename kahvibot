@@ -87,6 +87,7 @@ class KahviBot():
           )
       if self.watermark is None:
         raise KeyError
+      syslog.syslog(syslog.LOG_INFO, "kahvibot: using watermark {}".format(watermark_path))
 
     except KeyError as e:
       syslog.syslog(syslog.LOG_INFO, "kahvibot: watermark not found")
