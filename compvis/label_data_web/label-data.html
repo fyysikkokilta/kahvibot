@@ -87,6 +87,7 @@ body {
 		Käyttäjät ovat luokitelleet {{ n_labeled_items }} kuvaa {{ label_count }} kertaa.
 		</p>
 		<div class="cropped"><img src="{{ image_to_label }}"></div>
+		<div>{{ image_to_label }}</div>
 		<form method="post">
 			<input type="hidden" name="filename" value="{{ image_to_label }}">
 			<input type="hidden" name="count" value="{{ n_images }}">
