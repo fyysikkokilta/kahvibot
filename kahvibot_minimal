@@ -9,9 +9,9 @@ Uses the python-telegram-bot library.
 """
 #TODO: put image file in static path and host it so it can be accessed without telegram
 
-#import syslog
 import logging
 import logging.handlers
+
 from telegram.ext import Updater, CommandHandler, MessageHandler
 
 from config import get_config_dict
@@ -22,22 +22,19 @@ from config import get_config_dict
 #except ImportError:
 #  Image = None
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
 log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s"))
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
 def send_and_log(update, context, log_msg = None,
-                 #log_level = syslog.LOG_INFO,
                  log_fun=logger.info,
                  **kwargs):
 
     context.bot.send_message(chat_id=update.effective_chat.id, **kwargs)
 
     if log_msg is not None:
-        print("asd")
-        #syslog.syslog(log_level, log_msg)
         log_fun(log_msg)
 
 
@@ -57,7 +54,8 @@ def send_webcam_photo(update, context, watermark = None):
 
 
 def error_callback(update, context):
-    pass
+    logger.error("Caught exception")
+    logger.error("", exc_info=True)
 
 def flush_messages(update, context):
     pass
@@ -65,7 +63,7 @@ def flush_messages(update, context):
 if __name__ == "__main__":
     import argparse
 
-    #syslog.openlog(ident="kahvibot", logoption=syslog.LOG_PID)
+    logging.basicConfig(level=logging.INFO)
 
     ap = argparse.ArgumentParser(description = "Run a telegram bot that tells how much coffee there is.")
 
@@ -82,9 +80,6 @@ if __name__ == "__main__":
     if not bot_token:
       raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
 
-    #TODO: how the fuck do I log exceptions to syslog
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                 level=logging.INFO)
 
     updater = Updater(token=bot_token, use_context=True)
     #TODO: flush messages
@@ -97,4 +92,4 @@ if __name__ == "__main__":
 
     updater.start_polling()
 
-    #dispatcher.add_error_handler(error_callback)
+    dispatcher.add_error_handler(error_callback)
