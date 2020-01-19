@@ -5,7 +5,7 @@ including calibration parameters.
 
 import configparser
 from os import path
-import syslog
+import logging
 
 """
 Default options
@@ -37,7 +37,8 @@ def get_config_dict(filename = None):
         raise IOError("Configuration file {} does not exist.".format(filename))
 
     cp.read(filename)
-    syslog.syslog(syslog.LOG_INFO, "config: Using configuration file " + filename)
+    logger = logging.getLogger("kahvibot.config")
+    logger.info("config: Using configuration file " + filename)
 
     # check for placeholder telegram bot token
     if set(cp["telegram"]["bot_token"]) == set("X"):
@@ -50,6 +51,7 @@ if __name__ == "__main__":
     # test by running `python3 config.py`
 
     import argparse
+
     from pprint import pprint
 
     ap = argparse.ArgumentParser()
