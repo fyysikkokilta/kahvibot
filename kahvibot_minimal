@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Small python script for running a Telegram bot which takes a picture with a
+webcam on certain commands or keywords.
+
+Uses the python-telegram-bot library.
+"""
+#TODO: put image file in static path and host it so it can be accessed without telegram
+
+#import syslog
+import logging
+import logging.handlers
+from telegram.ext import Updater, CommandHandler, MessageHandler
+
+from config import get_config_dict
+
+#TODO: watermark feature (see https://stackoverflow.com/questions/43708681/pil-png-image-as-watermark-for-a-jpg-image)
+#try:
+#  from PIL import Image
+#except ImportError:
+#  Image = None
+
+logger = logging.getLogger(__file__)
+log_handler = logging.handlers.SysLogHandler(address="/dev/log")
+log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s"))
+logger.addHandler(log_handler)
+logger.setLevel(logging.INFO)
+
+def send_and_log(update, context, log_msg = None,
+                 #log_level = syslog.LOG_INFO,
+                 log_fun=logger.info,
+                 **kwargs):
+
+    context.bot.send_message(chat_id=update.effective_chat.id, **kwargs)
+
+    if log_msg is not None:
+        print("asd")
+        #syslog.syslog(log_level, log_msg)
+        log_fun(log_msg)
+
+
+def format_sender(msg):
+    pass
+
+
+def send_help(update, context):
+    #context.bot.send_message(chat_id=update.effective_chat.id, )
+
+    msg = "???"
+    send_and_log(update, context, log_msg="testing", text=msg)
+
+
+def send_webcam_photo(update, context, watermark = None):
+    raise Exception("foo")
+
+
+def error_callback(update, context):
+    pass
+
+def flush_messages(update, context):
+    pass
+
+if __name__ == "__main__":
+    import argparse
+
+    #syslog.openlog(ident="kahvibot", logoption=syslog.LOG_PID)
+
+    ap = argparse.ArgumentParser(description = "Run a telegram bot that tells how much coffee there is.")
+
+    ap.add_argument("-c", "--config",
+        dest="config_file",
+        help="Use CONFIG_FILE as the configuration file instead of the default."
+        )
+
+    args = ap.parse_args()
+
+    config_dict = get_config_dict(args.config_file)
+
+    bot_token = config_dict["telegram"]["bot_token"]
+    if not bot_token:
+      raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
+
+    #TODO: how the fuck do I log exceptions to syslog
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                 level=logging.INFO)
+
+    updater = Updater(token=bot_token, use_context=True)
+    #TODO: flush messages
+
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", send_help))
+    dispatcher.add_handler(CommandHandler("help", send_help))
+    dispatcher.add_handler(CommandHandler("status", send_webcam_photo))
+
+    updater.start_polling()
+
+    #dispatcher.add_error_handler(error_callback)
