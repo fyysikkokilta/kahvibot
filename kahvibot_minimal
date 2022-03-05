@@ -14,7 +14,10 @@ import logging.handlers
 
 from telegram.ext import Updater, CommandHandler, MessageHandler
 
-from config import get_config_dict
+from config import (
+    bot_token,
+    admin_username,
+)
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -82,32 +85,20 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
 
-    ap = argparse.ArgumentParser(description = "Run a telegram bot that tells how much coffee there is.")
-
-    ap.add_argument("-c", "--config",
-        dest="config_file",
-        help="Use CONFIG_FILE as the configuration file instead of the default."
-        )
-
-    args = ap.parse_args()
-
-    config_dict = get_config_dict(args.config_file)
-
-    tg_config = config_dict["telegram"]
-    bot_token = tg_config["bot_token"]
-
     if not bot_token:
         raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
-    if "admin_username" not in tg_config:
+    if not admin_username:
         raise ValueError("admin_username not defined in config file.")
 
-    admin_username = tg_config["admin_username"]
+    # prepend '@' if applicable
+    admin_username_with_at = ("@" if not admin_username.startswith("@") else "") + admin_username
 
     updater = Updater(token=bot_token, use_context=True)
 
     dispatcher = updater.dispatcher
-    dispatcher.bot.admin_username = admin_username
-    dispatcher.bot.help_text = help_text_fmt.format(admin_username)
+    #TODO: adding attributes like this is deprecated...
+    dispatcher.bot.admin_username = admin_username_with_at
+    dispatcher.bot.help_text = help_text_fmt.format(admin_username_with_at)
 
     dispatcher.add_handler(CommandHandler("start", send_help))
     dispatcher.add_handler(CommandHandler("help", send_help))
