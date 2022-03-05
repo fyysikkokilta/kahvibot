@@ -16,17 +16,27 @@ from telegram.ext import Updater, CommandHandler, MessageHandler
 
 from config import get_config_dict
 
-#TODO: watermark feature (see https://stackoverflow.com/questions/43708681/pil-png-image-as-watermark-for-a-jpg-image)
-#try:
-#  from PIL import Image
-#except ImportError:
-#  Image = None
-
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
 log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s"))
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
+
+#TODO: watermark feature (see https://stackoverflow.com/questions/43708681/pil-png-image-as-watermark-for-a-jpg-image)
+#try:
+#  from PIL import Image
+#except ImportError:
+#  logger.warning("Could not import PIL, watermark feature is not available")
+#  Image = None
+
+help_text_fmt = """
+Komennot / commands:
+/status - Näytä kahvin määrä kiltiksellä tällä hetkellä / Show the current amount of coffee at the guild room
+/help - Näytä tämä viesti / Show this message
+
+Onko jokin vialla? Onko sinulla parannusehdotus? Ota yhteyttä ylläpitäjään {0}.
+Is something wrong? Do you have a feature request? Contact the administrator {0}.
+"""
 
 def send_and_log(update, context, log_msg = None,
                  log_fun=logger.info,
@@ -37,16 +47,23 @@ def send_and_log(update, context, log_msg = None,
     if log_msg is not None:
         log_fun(log_msg)
 
+def format_log_message(fmt_str, update) -> str:
+    m = update.message
+    info = ""
+    if m and m.from_user:
+        u = m.from_user
+        if u.full_name:
+            info += u.full_name
+        if u.username:
+            info += " ({})".format(u.username)
 
-def format_sender(msg):
-    pass
-
+    return fmt_str.format(info)
 
 def send_help(update, context):
     #context.bot.send_message(chat_id=update.effective_chat.id, )
 
-    msg = "???"
-    send_and_log(update, context, log_msg="testing", text=msg)
+    log_msg = format_log_message("Sent help to {}", update)
+    send_and_log(update, context, log_msg=log_msg, text=context.bot.help_text)
 
 
 def send_webcam_photo(update, context, watermark = None):
@@ -76,14 +93,21 @@ if __name__ == "__main__":
 
     config_dict = get_config_dict(args.config_file)
 
-    bot_token = config_dict["telegram"]["bot_token"]
-    if not bot_token:
-      raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
+    tg_config = config_dict["telegram"]
+    bot_token = tg_config["bot_token"]
 
+    if not bot_token:
+        raise ValueError("Telegram bot token not provided (did you set it in the configuration?)")
+    if "admin_username" not in tg_config:
+        raise ValueError("admin_username not defined in config file.")
+
+    admin_username = tg_config["admin_username"]
 
     updater = Updater(token=bot_token, use_context=True)
 
     dispatcher = updater.dispatcher
+    dispatcher.bot.admin_username = admin_username
+    dispatcher.bot.help_text = help_text_fmt.format(admin_username)
 
     dispatcher.add_handler(CommandHandler("start", send_help))
     dispatcher.add_handler(CommandHandler("help", send_help))
