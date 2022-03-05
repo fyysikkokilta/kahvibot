@@ -15,7 +15,8 @@ library, and the pictures are taken using ??. Optionally, a watermark can be add
 ### Setup
 
 1. `git clone` the repo on to your device
-1. Install dependencies: `sudo apt install fswebcam && sudo pip3 install python-telegram-bot`.
+1. Create a virtualenv. You have to install `sudo apt install python3-virtualenv` on raspbian, then `python3 -m virtualenv virtualenvname`. Activate the virtualenv with `source virtualenvname/bin/activate` and  `pip install python-telegram-bot` (tested with `python-telegram-bot` version 13.11).
+1. Install webcam software: `sudo apt install fswebcam`
 1. Set up your configuration file with your bot token (see below)
 1. Make the script file excutable: `chmod +x kahvibot`
 
