@@ -39,6 +39,10 @@ This is useful for debugging, or if you don't like systemd or something.
 1. You can also set up the Pi to run your script at startup if it is rebooted or something.
 
 
+## Hacking
+
+While developing, you can run the script `bot-offline.py`, which just responds with a simple "the bot is offline" message to all queries. It also uses the bot token from the config file. It's easiest to run this script on e.g. kosh inside `tmux` or something.
+
 ### Configuration
 #### Configuration file
 **TODO**
