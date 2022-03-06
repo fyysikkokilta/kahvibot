@@ -1,83 +1,75 @@
 """
 A very simple script that creates an appropriate systemd service config.
-Currently works only on debian and is pretty dirty overall.
+Currently works only on raspbian/debian and is pretty spaghettyish overall.
 """
 
 from os import path
 import sys
 
-exec_path_daemon = path.join(path.dirname(path.abspath(__file__)), "kahvid")
-service_path_daemon = "/etc/systemd/system/kiltiskahvi.service"
+kahvibot_root = path.dirname(path.abspath(__file__))
 
-exec_path_bot = path.join(path.dirname(path.abspath(__file__)), "kahvibot")
-service_path_bot = "/etc/systemd/system/kahvibot.service"
+virtualenv_path = path.join(kahvibot_root, "venv")
+if not path.exists(virtualenv_path):
+    raise ValueError(f"Could not find virtual env at '{virtualenv_path}'.")
 
-# TODO: move these to separate files?
-service_content_daemon = """# systemd configuration for kahvid
+exec_path = path.join(kahvibot_root, "kahvibot")
+service_path = "/etc/systemd/system/kahvibot.service"
+
+service_content_fmt = """
+# systemd configuration for kahvibot
 [Unit]
-Description=Coffee measurement daemon
+Description=Telegram bot for checking the amount of coffee
 
-[Service]
-ExecStart={}
-ExecReload=/bin/kill -HUP $MAINPID
-Type=simple
-PIDFile=/var/run/kahvid.pid
+# Only enable after network is online (after reboot)
+# see https://unix.stackexchange.com/questions/379167/starting-systemd-service-after-network-online-target-but-dns-is-still-not-availa
+# and https://www.freedesktop.org/wiki/Software/systemd/NetworkTarget/
+After=systemd-resolved.service network-online.target
+Wants=systemd-resolved.service network-online.target
 
-[Install]
-WantedBy=multi-user.target
-""".format(exec_path_daemon)
+# Even though we have the After and Wants options above, the first restart still fails.
+# So we add these and the RstartSec and Restart options below.
+StartLimitIntervalSec=1h
+StartLimitBurst=5
 
-service_content_bot = """# systemd configuration for kahvibot
-[Unit]
-Description=Telegram bot for reporting the amount of coffee
 
 [Service]
 ExecStart={}
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
 PIDFile=/var/run/kahvibot.pid
+WorkingDirectory={}
+RestartSec=10
+Restart=on-failure
+
 
 [Install]
 WantedBy=multi-user.target
-""".format(exec_path_bot)
+""".strip()
 
 
 """
 Check if the specified configuration file already exists. If it doesn't, create
 it. If it does, ask if the user wants to overwrite it.
 """
-def create_config_file(p, content, description):
-  if path.exists(p):
-    ans = input(
-        "Found systemd configuration file for {}. Do you want to overwrite it?(y/n) ".format(description)
-        ).lower()
-    if not ans in ["y", "yes"]:
-      print("Not writing configuration file for {}.".format(description))
-      return
+def create_config_file(fname: str, content: str):
+    if path.exists(fname):
+        ans = input(f"Found existing systemd configuration file {fname}. "
+                    "Do you want to overwrite it? (y/n) ")
+        ans = ans.lower()
+        if not ans in ["y", "yes"]:
+            print("Not writing configuration file.")
+            return
 
-  with open(p, "w") as f:
-    f.write(content)
+    with open(fname, "w") as f:
+        f.write(content)
 
-  print("Created systemd configuration file {} for {}.".format(p, description))
+    print(f"Created systemd configuration file {fname}. You can check the status with 'sudo service kahvibot status' and use 'sudo systemctl enable kahvibot' to make it run on startup.")
 
-"""
-Call the above function for both the measurement daemon and Telegram bot.
-"""
+
 if __name__ == "__main__":
 
-  # this is kinda hacky and not very thorough but oh well.
-  if not sys.version_info >= (3,):
-    sys.stderr.write(
-        "Python 3 is required. Found: {}.\n".format(
-          sys.version.split("\n")[0].rstrip()
-          )
-        )
-    sys.exit(1)
-
-  paths = [
-      (service_path_daemon, service_content_daemon, "kiltiskahvi service"),
-      (service_path_bot, service_content_bot, "kahvibot service"),
-      ]
-
-  for p, content, description in paths:
-    create_config_file(p, content, description)
+    # prepend the python interpreter inside the virtualenv to use that, see
+    # https://stackoverflow.com/a/37211676
+    exec_start = f"{virtualenv_path}/bin/python {exec_path}"
+    service_content = service_content_fmt.format(exec_start, kahvibot_root)
+    create_config_file(service_path, service_content)

@@ -1,3 +1,7 @@
+# don't commit the config file since it contains bot tokens etc
+config.py
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
