@@ -158,4 +158,5 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler("status", send_webcam_photo))
     dispatcher.add_error_handler(error_callback)
 
-    updater.start_polling(clean=True)
+    updater.start_polling(drop_pending_updates=True)
+    updater.idle()
