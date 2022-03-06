@@ -82,6 +82,8 @@ class CustomBot(Bot):
         self.watermark: Optional[Image] = None
         if watermark_path:  # don't add watermark if the path is empty
             self.watermark = Image.open(watermark_path)
+            if self.watermark.size != camera_dimensions:
+                logger.warning(f"Warning: watermark size is different from camera size: {self.watermark.size} vs {camera_dimensions}")
 
 
 def send_and_log(update, context, log_msg = None,
