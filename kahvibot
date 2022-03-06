@@ -56,7 +56,7 @@ log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
-help_text_fmt = """
+HELP_TEXT_FMT = """
 Komennot / commands:
 /status - Näytä kahvin määrä kiltiksellä tällä hetkellä / Show the current amount of coffee at the guild room
 /help - Näytä tämä viesti / Show this message
@@ -83,7 +83,7 @@ class CustomBot(Bot):
             admin_username = "@" + admin_username
 
         self.admin_username = admin_username
-        self.help_text = help_text_fmt.format(admin_username)
+        self.help_text = HELP_TEXT_FMT.format(admin_username)
 
         self.watermark: Optional[Image] = None
         if watermark_path:  # don't add watermark if the path is empty
@@ -150,7 +150,6 @@ def error_callback(update, context):
 
 
 if __name__ == "__main__":
-    import argparse
 
     logging.basicConfig(level=logging.INFO)
 
