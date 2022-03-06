@@ -95,3 +95,9 @@ only in the spring of 2022 during a weekend hackathon weekend at the guild
 room. With the rewrite, I reduced the code to just the simple core of taking
 pictures with the webcam, and improved the documentation. This way, the project
 could be picked up by soneone else now that I have basically graduated.
+
+With the rewrite, the bot actually became a bit slower to send pictures,
+because the `fswebcam` command always has to open a new session to the
+webcamera. But I think this is an ok tradeoff for not having to install OpenCV.
+I also considered rewriting it in Rust, but that is left as an exercises for
+the reader.
