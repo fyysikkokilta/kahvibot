@@ -91,9 +91,10 @@ folder `compvis/label_data_web/` in the `cv` branch.
 After the machine learning project, I got the idea to rewrite the whole script
 from scratch and remove all of the old stuff related to the scale and computer
 vision and such. I first started this in 2020, but then ended up finishing it
-only in the spring of 2022 during a weekend hackathon weekend at the guild
-room. With the rewrite, I reduced the code to just the simple core of taking
-pictures with the webcam, and improved the documentation. This way, the project
+only in the spring of 2022 during a weekend hackathon at the guild room. With
+the rewrite, I reduced the code to just the simple core of taking pictures with
+the webcam, and improved the documentation. I also switched from the
+unmaintained telepot library to python-telegram-bot. This way, the project
 could be picked up by soneone else now that I have basically graduated.
 
 With the rewrite, the bot actually became a bit slower to send pictures,
