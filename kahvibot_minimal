@@ -145,6 +145,7 @@ def add_watermark():
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
     # TODO: send 'typing...' status
+    bot = ctx.bot
 
     img = take_picture()
 
