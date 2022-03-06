@@ -44,18 +44,14 @@ This is useful for debugging, or if you don't like systemd or something.
 1. Run the bot: `./kahvibot`
 1. You can also set up the Pi to run your script at startup if it is rebooted I guess. I don't really know a good way to do it without systemd.
 
+### Configuration
+
+The bot is configured by just `import`ing values from the `config.py` file. See the comments in the example config for further details.
+
 
 ## Hacking
 
 While developing, you can run the script `bot-offline.py`, which just responds with a simple "the bot is offline" message to all queries. It also uses the bot token from the config file. It's easiest to run this script on e.g. kosh inside `tmux` or something.
-
-### Configuration
-#### Configuration file
-**TODO**
-
-
-#### Adding a watermark
-**TODO**
 
 
 ## History
