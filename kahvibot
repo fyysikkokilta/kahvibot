@@ -93,32 +93,8 @@ class CustomBot(Bot):
                 logger.warning(f"Warning: watermark size is different from camera size: {self.watermark.size} vs {camera_dimensions}")
 
 
-def send_and_log(update, context, log_msg = None,
-                 log_fun=logger.info,
-                 **kwargs):
-
-    context.bot.send_message(chat_id=update.effective_chat.id, **kwargs)
-
-    if log_msg is not None:
-        log_fun(log_msg)
-
-def format_log_message(fmt_str, update) -> str:
-    m = update.message
-    info = ""
-    if m and m.from_user:
-        u = m.from_user
-        if u.full_name:
-            info += u.full_name
-        if u.username:
-            info += " ({})".format(u.username)
-
-    return fmt_str.format(info)
-
-def send_help(update, context):
-    #context.bot.send_message(chat_id=update.effective_chat.id, )
-
-    log_msg = format_log_message("Sent help to {}", update)
-    send_and_log(update, context, log_msg=log_msg, text=context.bot.help_text)
+def send_help(update: Update, ctx: CallbackContext):
+    update.message.reply_text(ctx.bot.help_text)
 
 
 def take_picture() -> Image:
