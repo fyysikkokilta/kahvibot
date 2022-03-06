@@ -41,7 +41,6 @@ from telegram.ext import (
 
 from telegram.constants import CHATACTION_UPLOAD_PHOTO
 
-
 from config import (
     bot_token,
     admin_username,
