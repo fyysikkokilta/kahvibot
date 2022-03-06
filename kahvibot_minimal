@@ -9,14 +9,33 @@ Uses the python-telegram-bot library.
 """
 #TODO: put image file in static path and host it so it can be accessed without telegram
 
+import subprocess
+
 import logging
 import logging.handlers
 
-from telegram.ext import Updater, CommandHandler, MessageHandler
+from tempfile import NamedTemporaryFile
+
+from io import BytesIO
+
+from PIL import Image
+
+from telegram import (
+    Update,
+)
+
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    CallbackContext,
+)
+
 
 from config import (
     bot_token,
     admin_username,
+    camera_dimensions,
 )
 
 logger = logging.getLogger("kahvibot")
@@ -69,8 +88,42 @@ def send_help(update, context):
     send_and_log(update, context, log_msg=log_msg, text=context.bot.help_text)
 
 
-def send_webcam_photo(update, context, watermark = None):
-    raise Exception("foo")
+def take_picture() -> Image:
+    """
+    Take picture from webcamera using the fswebcam command and return it as a
+    pillow image.
+    """
+    with NamedTemporaryFile(suffix=".jpg") as f:
+        # Use the option "-S 20" to discard 20 frames before taking the picture,
+        # so that the camera has time to adjust the brightness automatically.
+        # This takes ~1-2s, the camera usually does 10-20fps.
+        # Use --no-banner to not put a banner on the picture, which fswebcam
+        # does by default for some reason.
+
+        #NOTE: fswebcam v 20140113 (available on Debian 11 Bullseye) doesn't
+        # return nonzero exit status on error... so we will get an exception
+        # from the Image.open() call below if taking the picture fails, even
+        # with check=True ...
+        w, h = camera_dimensions
+        subprocess.run(["fswebcam", "-S", "20", "--no-banner", "--resolution", f"{w}x{h}", f.name], check=True)
+        img = Image.open(f.name)
+    return img
+
+def add_watermark():
+    raise NotImplementedError
+
+
+def send_webcam_photo(update: Update, ctx: CallbackContext, watermark = None):
+    # TODO: send 'typing...' status
+
+    img = take_picture()
+    # img.tobytes() didn't work for some reason, so using BytesIO.
+    # see https://stackoverflow.com/a/54165463
+    bio = BytesIO()
+    bio.name = "image.jpg"
+    img.save(bio, "JPEG")
+    bio.seek(0)
+    update.message.reply_photo(bio)
 
 
 def error_callback(update, context):
