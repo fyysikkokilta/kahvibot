@@ -56,21 +56,23 @@ While developing, you can run the script `bot-offline.py`, which just responds w
 
 ## History
 
-Originally, in 2016, the idea of this project was to _measure_ the amount of
-coffee at the guild room, by hacking a cheap digital kitchen scale. The
-measured coffee data could then be stored and plotted and analyzed for detailed
-coffee statistics, as physics students do. This didn't pan out so well, since
-the load cell of the scale gave very unreliable results (I don't know what I
-was expecting for a 5€ scale bought from Aliexpress).
+Kahvibot was originally written by Márton Gunyhó in 2016. Initially, the idea
+of this project was to _measure_ the amount of coffee at the guild room, by
+hacking a cheap digital kitchen scale. The measured coffee data could then be
+stored and plotted and analyzed for interesting statistics, like coffee
+consumption during the day or to see if the coffee in the pan is stale and so
+on. This didn't _pan_ out so well, since the load cell of the scale gave very
+unreliable results (I don't know what I was expecting for a 5€ scale bought
+from Aliexpress).
 
 Around January 2018 came the great innovation of just attaching a webcam to the
 Pi and letting the users judge for themselves how much coffee there is. But
 this wasn't enough, I thought that maybe the webcamera could be used for
-measuring the coffee amount.  Initially, I attempted to use OpenCV and
-classical computer vision algorithms, with some very minimal success (this was
-before OpenCV was available in pip for Raspbian, it had to be compiled
-manually). The results of this attempt are available in the branch `cv`, for
-what they are worth.
+measuring the coffee amount. Initially, I tried to use OpenCV and traditional
+computer vision algorithms and feature engineering, with some very minimal
+success (this was before OpenCV was available in pip for Raspbian, it had to be
+compiled manually). The results of this attempt are available in the branch
+`cv`, for what they are worth.
 
 After fiddling with OpenCV, the next idea was of course to use the webcamera
 images with this new cool thing called _machine learning_. After dreaming about
@@ -79,14 +81,17 @@ Learning course at Aalto. In the end, we threw together a version using both
 `sklearn` and `pytorch` in a few days before the deadline, as is customary for
 course projects. We had decent success - with four different labels for images
 ("no coffee", "a little bit of coffee", "a lot of coffee" and "unknown"), we
-got around 85% correct labeling if I recall correctly. It wasn't good enough to
-put into production, though. The code for that is sitting somewhere in my
-school Gitlab. Something useful that came out of that project was a small html
-site for labeling images so that the work can be distributed among many people,
-that's available in the folder `compvis/label_data_web/` in the `cv` branch.
+got around 85% correct labeling if I recall correctly. In the end, I decided
+that this accuracy was not good enough, and the idea was not put into
+production. The code for that is sitting somewhere in my Aalto Gitlab.
+Something useful that came out of this project was a small website where people
+can label pictures of pans with the amount of coffee. This is available in the
+folder `compvis/label_data_web/` in the `cv` branch.
 
-In the beginning of 2020, I re-wrote the script from scratch and removed all of
-the old stuff related to the scale and the computer vision and everything,
-leaving just the very simple core of taking pictures with the webcam. As my
-graduation is nearing, I wanted to leave relatively clean code that might be
-picked up by somebody else to maintain.
+After the machine learning project, I got the idea to rewrite the whole script
+from scratch and remove all of the old stuff related to the scale and computer
+vision and such. I first started this in 2020, but then ended up finishing it
+only in the spring of 2022 during a weekend hackathon weekend at the guild
+room. With the rewrite, I reduced the code to just the simple core of taking
+pictures with the webcam, and improved the documentation. This way, the project
+could be picked up by soneone else now that I have basically graduated.
