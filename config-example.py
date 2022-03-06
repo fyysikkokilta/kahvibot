@@ -13,6 +13,14 @@ admin_username = ""
 # be 720p
 camera_dimensions = (1280, 720)
 
+
+# Use this picture as a watermark, for sponsorships etc. Should be a PNG image
+# with transparency. It is overlaid directly with the camera image, so it
+# should have the same dimensions as `camera_dimensions` above. Leave as an
+# empty string to have no watermark.
+watermark_path = ""
+
+
 # if a message contains any of these words, the bot responds
 trigger_words = [
     "kahvi",
