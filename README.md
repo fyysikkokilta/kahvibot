@@ -1,14 +1,16 @@
-# kiltiskahvi - minimal edition
+# kahvibot
 
-Kiltiskahvi is a simple Python program for checking the amount of coffee at the
+This repo contains `kahvibot`, a simple Python program for checking the amount of coffee at the
 [Guild of Physics](http://www.fyysikkokilta.fi/) guild room via a Telegram bot.
-The script runs on a Raspberry Pi at the guild room, with a webcamera taking a
-picture of the coffee pan when a user enters a command or says something with
-the keyword "kahvi" in it.
+The script runs on a Raspberry Pi at the guild room, and when a user sends a
+command or a message with the keyword "kahvi" in it, the bot takes a picture
+with a webcamera and sends it.
 
 Interfacing with the Telegram API is done using the
 [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
-library, and the pictures are taken using ??. Optionally, a watermark can be added to the photos using [PIL](https://pillow.readthedocs.io/en/stable/).
+library, and the pictures are taken using the `fswebcam` command. Optionally, a
+watermark can be added to the photos using
+[PIL](https://pillow.readthedocs.io/en/stable/).
 
 
 ## Usage
