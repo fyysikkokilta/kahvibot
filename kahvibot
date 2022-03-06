@@ -202,5 +202,9 @@ if __name__ == "__main__":
     dispatcher.add_handler(MessageHandler(Filters.text & Filters.regex(trigger_words_regex), send_webcam_photo))
     dispatcher.add_error_handler(error_callback)
 
-    updater.start_polling(drop_pending_updates=True)
+    # NOTE: when the raspi reboots, start_polling fails with a name resolution
+    # error even with bootstrap_retries=-1 for some reason. After a lot of
+    # troubleshooting, we ended up just configuring the systemd to restart the
+    # service automatically, see setup.py.
+    updater.start_polling(drop_pending_updates=True, bootstrap_retries=-1)
     updater.idle()

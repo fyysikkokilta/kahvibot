@@ -20,12 +20,27 @@ service_content_fmt = """
 [Unit]
 Description=Telegram bot for checking the amount of coffee
 
+# Only enable after network is online (after reboot)
+# see https://unix.stackexchange.com/questions/379167/starting-systemd-service-after-network-online-target-but-dns-is-still-not-availa
+# and https://www.freedesktop.org/wiki/Software/systemd/NetworkTarget/
+After=systemd-resolved.service network-online.target
+Wants=systemd-resolved.service network-online.target
+
+# Even though we have the After and Wants options above, the first restart still fails.
+# So we add these and the RstartSec and Restart options below.
+StartLimitIntervalSec=1h
+StartLimitBurst=5
+
+
 [Service]
 ExecStart={}
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
 PIDFile=/var/run/kahvibot.pid
 WorkingDirectory={}
+RestartSec=10
+Restart=on-failure
+
 
 [Install]
 WantedBy=multi-user.target
