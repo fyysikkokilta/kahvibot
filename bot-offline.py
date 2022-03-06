@@ -5,6 +5,8 @@ A quick script that responds to all messages that the bot is currently offline.
 
 from config import bot_token, trigger_words
 
+import re
+
 from telegram import (
     Update,
     MessageEntity,
@@ -44,7 +46,7 @@ if __name__ == "__main__":
 
     dispatcher.add_handler(CommandHandler("status", handle_message))
     dispatcher.add_handler(CommandHandler("help", handle_message))
-    trigger_words_regex = "|".join(trigger_words)
+    trigger_words_regex = re.compile("|".join(trigger_words), re.IGNORECASE)
     dispatcher.add_handler(MessageHandler(
         Filters.text & (
             Filters.chat_type.private  # answer any messages in private chat
