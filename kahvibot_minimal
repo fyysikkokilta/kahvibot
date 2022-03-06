@@ -39,6 +39,8 @@ from telegram.ext import (
     Filters,
 )
 
+from telegram.constants import CHATACTION_UPLOAD_PHOTO
+
 
 from config import (
     bot_token,
@@ -144,8 +146,9 @@ def add_watermark():
 
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
-    # TODO: send 'typing...' status
     bot = ctx.bot
+
+    update.message.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
     img = take_picture()
 
