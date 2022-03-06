@@ -94,7 +94,9 @@ class CustomBot(Bot):
 
 
 def send_help(update: Update, ctx: CallbackContext):
-    update.message.reply_text(ctx.bot.help_text)
+    msg = update.message
+    if msg:
+        msg.reply_text(ctx.bot.help_text)
 
 
 def take_picture() -> Image:
@@ -137,7 +139,9 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.name = "image.jpg"
     img.save(bio, "JPEG")
     bio.seek(0)
-    update.message.reply_photo(bio)
+    msg = update.message
+    if msg:
+        msg.reply_photo(bio)
 
 
 def error_callback(update, context):
