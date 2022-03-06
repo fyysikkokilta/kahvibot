@@ -138,7 +138,7 @@ def take_picture() -> Image:
         # from the Image.open() call below if taking the picture fails, even
         # with check=True ...
         w, h = camera_dimensions
-        subprocess.run(["fswebcam", "-S", "20", "--no-banner", "--resolution", f"{w}x{h}", f.name], check=True)
+        subprocess.run(["fswebcam", "--quiet", "-S", "20", "--no-banner", "--resolution", f"{w}x{h}", f.name], check=True)
         img = Image.open(f.name)
     return img
 
