@@ -5,7 +5,7 @@ Minimal config file for kahvibot. Just define values as normal Python code.
 # put your bot token here as a string
 bot_token = ""
 
-# the tg username of the bot's admin.
+# The Telegram username of the bot's admin. This is used in the help text.
 admin_username = ""
 
 # The size of the pictures the webcamera takes.  As of 2022-03-06, the guild
