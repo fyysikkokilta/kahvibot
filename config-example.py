@@ -8,6 +8,11 @@ bot_token = ""
 # the tg username of the bot's admin.
 admin_username = ""
 
+# The size of the pictures the webcamera takes.  As of 2022-03-06, the guild
+# room has a Creative Live! Cam Sync HD USB webcamera, which at least claims to
+# be 720p
+camera_dimensions = (1280, 720)
+
 # if a message contains any of these words, the bot responds
 trigger_words = [
     "kahvi",
