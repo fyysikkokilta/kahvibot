@@ -50,8 +50,6 @@ if __name__ == "__main__":
     dispatcher.add_handler(MessageHandler(
         Filters.text & (
             Filters.chat_type.private  # answer any messages in private chat
-            # in group chats, answer mentions or messages that contain the trigger words
-            | Filters.entity(MessageEntity.MENTION)
             | Filters.regex(trigger_words_regex)
             ),
         handle_message
