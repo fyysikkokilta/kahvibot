@@ -7,7 +7,9 @@ webcam on certain commands or keywords.
 
 Uses the python-telegram-bot library.
 """
-#TODO: put image file in static path and host it so it can be accessed without telegram
+#TODO: put image file in static path and host it so it can be accessed via an external API
+
+from typing import Optional
 
 import subprocess
 
@@ -39,6 +41,7 @@ from config import (
     bot_token,
     admin_username,
     camera_dimensions,
+    watermark_path,
 )
 
 logger = logging.getLogger("kahvibot")
@@ -46,13 +49,6 @@ log_handler = logging.handlers.SysLogHandler(address="/dev/log")
 log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s"))
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
-
-#TODO: watermark feature (see https://stackoverflow.com/questions/43708681/pil-png-image-as-watermark-for-a-jpg-image)
-#try:
-#  from PIL import Image
-#except ImportError:
-#  logger.warning("Could not import PIL, watermark feature is not available")
-#  Image = None
 
 help_text_fmt = """
 Komennot / commands:
@@ -68,7 +64,11 @@ class CustomBot(Bot):
     """
     Simple custom telegram bot class with some extra attributes.
     """
-    def __init__(self, admin_username: str, **kwargs):
+    def __init__(self,
+        admin_username: str,
+        watermark_path: str = "",
+        **kwargs
+    ):
 
         super().__init__(**kwargs)
 
@@ -78,6 +78,10 @@ class CustomBot(Bot):
 
         self.admin_username = admin_username
         self.help_text = help_text_fmt.format(admin_username)
+
+        self.watermark: Optional[Image] = None
+        if watermark_path:  # don't add watermark if the path is empty
+            self.watermark = Image.open(watermark_path)
 
 
 def send_and_log(update, context, log_msg = None,
@@ -133,10 +137,16 @@ def add_watermark():
     raise NotImplementedError
 
 
-def send_webcam_photo(update: Update, ctx: CallbackContext, watermark = None):
+def send_webcam_photo(update: Update, ctx: CallbackContext):
     # TODO: send 'typing...' status
 
     img = take_picture()
+
+    if bot.watermark is not None:
+        # Use the watermark image as the mask as well, so it's alpha channel is
+        # used. See the the pillow Image.paste() docs for details.
+        img.paste(bot.watermark, mask=bot.watermark)
+
     # img.tobytes() didn't work for some reason, so using BytesIO.
     # see https://stackoverflow.com/a/54165463
     bio = BytesIO()
@@ -167,6 +177,7 @@ if __name__ == "__main__":
     bot = CustomBot(
         admin_username=admin_username,
         token=bot_token,
+        watermark_path=watermark_path,
         # this gets rid of some warnings (and maybe connection problems?)
         request=Request(con_pool_size=8),
     )
