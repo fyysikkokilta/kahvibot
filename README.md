@@ -17,30 +17,32 @@ watermark can be added to the photos using
 ### Setup
 
 1. `git clone` the repo on to your device
-1. Create a virtualenv. You have to install `sudo apt install python3-virtualenv` on raspbian, then `python3 -m virtualenv venv` to create the environment, where `venv` is the environment name. Activate the env with `source venv/bin/activate`.
+1. Create a virtualenv. You have to install `sudo apt install python3-virtualenv` on raspbian, then create the environment with `python3 -m virtualenv venv`, where `venv` is the environment name. Activate the env with `source venv/bin/activate`.
 1. Inside the virtualenv, install the dependencies: `pip install python-telegram-bot pillow`. The script is tested with `python-telegram-bot` version 13.11 and `pillow` version 9.0.1.
-1. Install command to take pictures with USB wecbamera: `sudo apt install fswebcam`. The script is tested with `fswebcam` version 20140113.
-1. Copy the example config file to an actual config file: `cp config-example.py config.py` and add your bot token to the config file.
+1. Install the command to take pictures with the USB webcamera: `sudo apt install fswebcam`. The script is tested with `fswebcam` version 20140113.
+1. Get a bot token from @BotFather if you haven't already. Also, disable privacy mode for the bot, if you want it to respond to any message that contains some specific words.
+1. Copy the example config file to an actual config file: `cp config-example.py config.py` and add your bot token to the config file. Check also the other options in the config.
 1. Make the script file excutable: `chmod +x kahvibot`
 
 You then have two options for running the bot, either with a systemd service (recommended) or manually (using `screen` or `tmux`).
 
 #### Running as a systemd service
-This makes restarting and automatically running the script on startup easier.
+This makes it easier to restart and automatically run the script on startup.
 Note that in this case the script is run as sudo, although it shouldn't be a
 problem.
 
 1. Check that `virtualenv_path` in `setup.py` matches the name of the virtualenv you created above.
 1. Run `sudo python3 setup.py`. This just creates a systemd script in `/etc/systemd/system/`.
-1. Run `sudo service kahvibot start` to start the telegram bot. Check the syslog to see that it's working (or if it's not). You can do it using e.g. the command `sudo tail -f /var/log/syslog`.
-1. Run `sudo systemctl enable kahvibot` to make it also start on boot, and you should be good to go.
+1. Run `sudo service kahvibot start` to start the telegram bot. Check the syslog to see that it's working (or if it's not). You can do so using e.g. the command `sudo tail -f /var/log/syslog`.
+1. Run `sudo systemctl enable kahvibot` to make it also start on boot, and you should be good to go. You can check the status of the bot using `sudo service kahvibot status`.
+1. If the bot doesn't respond, you can check the syslog, and/or just reboot it by re-plugging the power socket of the raspi.
 
 #### Running manually
 This is useful for debugging, or if you don't like systemd or something.
 
 1. Add the user who will be running the script to the `video` group, so they can access the webcam: `sudo usermod -a -G video $USER`. You will need to log out and log back in to reflect the changes.
 1. Run the bot: `./kahvibot`
-1. You can also set up the Pi to run your script at startup if it is rebooted or something.
+1. You can also set up the Pi to run your script at startup if it is rebooted I guess. I don't really know a good way to do it without systemd.
 
 
 ## Hacking
