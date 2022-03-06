@@ -22,6 +22,7 @@ from PIL import Image
 
 from telegram import (
     Update,
+    Bot,
 )
 
 from telegram.ext import (
@@ -59,6 +60,23 @@ Komennot / commands:
 Onko jokin vialla? Onko sinulla parannusehdotus? Ota yhteyttä ylläpitäjään {0}.
 Is something wrong? Do you have a feature request? Contact the administrator {0}.
 """
+
+
+class CustomBot(Bot):
+    """
+    Simple custom telegram bot class with some extra attributes.
+    """
+    def __init__(self, admin_username: str, **kwargs):
+
+        super().__init__(**kwargs)
+
+        # prepend '@' if applicable
+        if not admin_username.startswith("@"):
+            admin_username = "@" + admin_username
+
+        self.admin_username = admin_username
+        self.help_text = help_text_fmt.format(admin_username)
+
 
 def send_and_log(update, context, log_msg = None,
                  log_fun=logger.info,
@@ -143,16 +161,11 @@ if __name__ == "__main__":
     if not admin_username:
         raise ValueError("admin_username not defined in config file.")
 
-    # prepend '@' if applicable
-    admin_username_with_at = ("@" if not admin_username.startswith("@") else "") + admin_username
-
-    updater = Updater(token=bot_token, use_context=True)
+    # initialize custom bot class
+    bot = CustomBot(admin_username=admin_username, token=bot_token)
+    updater = Updater(bot=bot, use_context=True)
 
     dispatcher = updater.dispatcher
-    #TODO: adding attributes like this is deprecated...
-    dispatcher.bot.admin_username = admin_username_with_at
-    dispatcher.bot.help_text = help_text_fmt.format(admin_username_with_at)
-
     dispatcher.add_handler(CommandHandler("start", send_help))
     dispatcher.add_handler(CommandHandler("help", send_help))
     dispatcher.add_handler(CommandHandler("status", send_webcam_photo))
