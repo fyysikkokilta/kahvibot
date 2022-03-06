@@ -24,8 +24,9 @@ watermark_path = ""
 # if a message contains any of these words, the bot responds
 trigger_words = [
     "kahvi",
-    "\u2615", # coffee emoji
+    "\u2615", # coffeecup emoji
     "tsufe",
     "kahavi",
+    "coffee",
     #"sima", # wappu mode
 ]
