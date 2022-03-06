@@ -25,6 +25,8 @@ from telegram import (
     Bot,
 )
 
+from telegram.utils.request import Request
+
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -162,7 +164,12 @@ if __name__ == "__main__":
         raise ValueError("admin_username not defined in config file.")
 
     # initialize custom bot class
-    bot = CustomBot(admin_username=admin_username, token=bot_token)
+    bot = CustomBot(
+        admin_username=admin_username,
+        token=bot_token,
+        # this gets rid of some warnings (and maybe connection problems?)
+        request=Request(con_pool_size=8),
+    )
     updater = Updater(bot=bot, use_context=True)
 
     dispatcher = updater.dispatcher
