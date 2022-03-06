@@ -1,15 +1,22 @@
 """
 A very simple script that creates an appropriate systemd service config.
-Currently works only on raspbian/debian and is pretty dirty overall.
+Currently works only on raspbian/debian and is pretty spaghettyish overall.
 """
 
 from os import path
 import sys
 
-exec_path = path.join(path.dirname(path.abspath(__file__)), "kahvibot")
+kahvibot_root = path.dirname(path.abspath(__file__))
+
+virtualenv_path = path.join(kahvibot_root, "venv")
+if not path.exists(virtualenv_path):
+    raise ValueError(f"Could not find virtual env at '{virtualenv_path}'.")
+
+exec_path = path.join(kahvibot_root, "kahvibot")
 service_path = "/etc/systemd/system/kahvibot.service"
 
-service_content_fmt = """# systemd configuration for kahvibot
+service_content_fmt = """
+# systemd configuration for kahvibot
 [Unit]
 Description=Telegram bot for checking the amount of coffee
 
@@ -18,43 +25,36 @@ ExecStart={}
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
 PIDFile=/var/run/kahvibot.pid
+WorkingDirectory={}
 
 [Install]
 WantedBy=multi-user.target
-"""
+""".strip()
 
 
 """
 Check if the specified configuration file already exists. If it doesn't, create
 it. If it does, ask if the user wants to overwrite it.
 """
-def create_config_file(p, content, description):
-    if path.exists(p):
-        ans = input("Found existing systemd configuration file for {}. "
-                    "Do you want to overwrite it?(y/n) ".format(description))
+def create_config_file(fname: str, content: str):
+    if path.exists(fname):
+        ans = input(f"Found existing systemd configuration file {fname}. "
+                    "Do you want to overwrite it? (y/n) ")
         ans = ans.lower()
         if not ans in ["y", "yes"]:
-            print("Not writing configuration file for {}.".format(description))
+            print("Not writing configuration file.")
             return
 
-    with open(p, "w") as f:
+    with open(fname, "w") as f:
         f.write(content)
 
-    print("Created systemd configuration file {} for {}.".format(p, description))
+    print(f"Created systemd configuration file {fname}. You can check the status with 'sudo service kahvibot status' and use 'sudo systemctl enable kahvibot' to make it run on startup.")
 
 
 if __name__ == "__main__":
 
-    # this is kinda hacky and not very thorough but oh well.
-    if not sys.version_info >= (3,):
-        ver = sys.version.split("\n")[0].strip()
-        msg = "Python 3 is required. Found: {}.\n".format(ver)
-        sys.stderr.write(msg)
-        sys.exit(1)
-
-    args = " ".join(sys.argv[1:])
-    if args:
-        exec_path += " " + args
-
-    service_content = service_content_fmt.format(exec_path)
-    create_config_file(service_path, service_content, "kiltiskahvi service")
+    # prepend the python interpreter inside the virtualenv to use that, see
+    # https://stackoverflow.com/a/37211676
+    exec_start = f"{virtualenv_path}/bin/python {exec_path}"
+    service_content = service_content_fmt.format(exec_start, kahvibot_root)
+    create_config_file(service_path, service_content)
