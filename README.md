@@ -100,5 +100,5 @@ could be picked up by soneone else now that I have basically graduated.
 With the rewrite, the bot actually became a bit slower to send pictures,
 because the `fswebcam` command always has to open a new session to the
 webcamera. But I think this is an ok tradeoff for not having to install OpenCV.
-I also considered rewriting it in Rust, but that is left as an exercises for
-the reader.
+I also considered rewriting it in Rust, but that is left as an exercise for the
+reader.
