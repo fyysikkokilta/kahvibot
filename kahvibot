@@ -38,7 +38,7 @@ from telegram.ext import (
     CallbackContext,
     Filters,
 )
-
+import random
 from telegram.constants import CHATACTION_UPLOAD_PHOTO
 
 from config import (
@@ -46,6 +46,7 @@ from config import (
     admin_username,
     camera_dimensions,
     watermark_path,
+    watermark_path_alt,
     trigger_words,
 )
 
@@ -91,6 +92,13 @@ class CustomBot(Bot):
             if self.watermark.size != camera_dimensions:
                 logger.warning(f"Warning: watermark size is different from camera size: {self.watermark.size} vs {camera_dimensions}")
 
+        self.watermark_alt: Optional[Image] = None
+        if watermark_path_alt:  # don't add watermark if the path is empty
+            self.watermark_alt = Image.open(watermark_path_alt)
+            logger.info(f"Using watermark {watermark_path_alt}")
+            if self.watermark_alt.size != camera_dimensions:
+                logger.warning(f"Warning: watermark size is different from camera size: {self.watermark_alt.size} vs {camera_dimensions}")
+
 
 def send_help(update: Update, ctx: CallbackContext):
     msg = update.message
@@ -130,7 +138,10 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     if bot.watermark is not None:
         # Use the watermark image as the mask as well, so it's alpha channel is
         # used. See the the pillow Image.paste() docs for details.
-        img.paste(bot.watermark, mask=bot.watermark)
+        if random.random() < 0.1 and bot.watermark_alt is not None:
+            img.paste(bot.watermark_alt, mask=bot.watermark_alt)
+        else:
+            img.paste(bot.watermark, mask=bot.watermark)
 
     # img.tobytes() didn't work for some reason, so using BytesIO.
     # see https://stackoverflow.com/a/54165463
