@@ -137,23 +137,32 @@ def read_coffee_level(image_path: str) -> Optional[dict]:
     """
     if not coffee_reader_cmd:
         return None
+    record = None
     try:
         proc = subprocess.run(
             list(coffee_reader_cmd) + [image_path],
             capture_output=True, text=True, timeout=coffee_reader_timeout,
         )
         record = json.loads(proc.stdout.strip().splitlines()[-1])
-        record["captured_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        if coffee_reader_log:
-            with open(coffee_reader_log, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(record) + "\n")
-        if "pots" not in record:
-            logger.warning(f"coffee reader returned no pots: {record.get('error')}")
-            return None
-        return record
     except Exception:
         logger.warning("coffee reader failed", exc_info=True)
+    # Log failures too, not just successes: the burn-in question is "what
+    # fraction of photos yields a reading", and a log that only sees successes
+    # cannot answer it. The log path is a strftime pattern, so a value like
+    # "readings-%Y-%m.jsonl" rotates monthly for free (a plain path, having no
+    # % codes, passes through strftime unchanged).
+    if coffee_reader_log:
+        entry = record if isinstance(record, dict) else {"error": "reader produced no JSON"}
+        entry.setdefault("captured_at",
+                         datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        try:
+            with open(datetime.now().strftime(coffee_reader_log), "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry) + "\n")
+        except OSError:
+            logger.warning("coffee reader log write failed", exc_info=True)
+    if not isinstance(record, dict) or "pots" not in record:
         return None
+    return record
 
 
 # Display names for the two camera-frame sides.
