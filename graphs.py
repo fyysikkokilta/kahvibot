@@ -263,6 +263,8 @@ def _half_cup_phrase(ml, fi):
     s = (str(whole) if whole else "") + ("½" if hc != whole else "")
     if hc == 1.0:
         return "~1 kuppi" if fi else "~1 cup"
+    if not fi and hc < 1.0:
+        return "~%s cup" % s
     return ("~%s kuppia" % s) if fi else ("~%s cups" % s)
 
 
