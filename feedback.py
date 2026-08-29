@@ -512,6 +512,18 @@ class FeedbackManager:
             return None
         return Ladder(float(s["top"]), float(s["base"]))
 
+    def ladder_for_offer(self, offer: Dict[str, Any]) -> Optional[Ladder]:
+        """The offer's own span (this frame's vessel geometry) when sane,
+        else the per-side constants. Keeps old offers and sentinels working."""
+        s = offer.get("span_frame_px") or {}
+        try:
+            top, base = float(s["top"]), float(s["base"])
+            if 0.0 <= top < base:
+                return Ladder(top, base)
+        except (KeyError, TypeError, ValueError):
+            pass
+        return self.ladder_for(offer.get("side", ""))
+
     # ======================================================================
     # 1. group side: decorate the bot's photo reply
     # ======================================================================
@@ -627,13 +639,28 @@ class FeedbackManager:
                     "rows_frame_px": pot["rows_frame_px"]}
         fill = pot.get("fill_fraction")
         stratum = min(STRATA - 1, int(fill * STRATA)) if fill is not None else None
+        # Ladder span: THIS frame's own vessel geometry (the reader's base and
+        # max-fill rows), so the ticks land on the pot wherever the camera and
+        # carafes sit today. This anchors the ladder to the vessel, never to
+        # the surface estimate - the anti-anchoring property protects the
+        # surface, not the glassware - and the archive constants proved stale
+        # the first time the camera moved (2026-08). Constants stay as the
+        # fallback for degenerate detections.
+        span = {"base": self.span[side]["base"], "top": self.span[side]["top"]}
+        span_source = self.span_source
+        rows = pot.get("rows_frame_px") or {}
+        try:
+            b, t = float(rows["base"]), float(rows["top"])
+            if 0.0 <= t and t + 120.0 <= b <= 720.0:
+                span, span_source = {"base": b, "top": t}, "frame_rows_v1"
+        except (KeyError, TypeError, ValueError):
+            pass
         return {"stem": stem, "side": side, "frame": frame,
                 "box": pot.get("box"), "frame_wh": [1280, 720],
                 "box_source": "fastbox", "pool": pool, "blind": blind,
                 "hint": hint, "stratum": stratum,
-                "span_frame_px": {"base": self.span[side]["base"],
-                                  "top": self.span[side]["top"]},
-                "span_source": self.span_source,
+                "span_frame_px": span,
+                "span_source": span_source,
                 "reader_version": self.reader_version, "sentinel": False}
 
     def _fresh_offer(self, reading: Optional[dict]) -> Optional[Dict[str, Any]]:
@@ -704,9 +731,11 @@ class FeedbackManager:
              "box_source": ent.get("box_source", "fastbox"),
              "pool": "sentinel", "blind": blind, "sentinel": True,
              "hint": ent.get("hint"), "stratum": ent.get("stratum"),
-             "span_frame_px": {"base": self.span[side]["base"],
-                               "top": self.span[side]["top"]},
-             "span_source": self.span_source,
+             "span_frame_px": ent.get("span_frame_px")
+                 or ((ent.get("hint") or {}).get("rows_frame_px"))
+                 or {"base": self.span[side]["base"],
+                     "top": self.span[side]["top"]},
+             "span_source": ent.get("span_source", self.span_source),
              "reader_version": self.reader_version,
              "truth_y_surf_frame_px": ent.get("y_surf_frame_px")}
         return o
@@ -934,7 +963,7 @@ class FeedbackManager:
         now = time.time()
         y_px = frac = None
         if visible and band and tick:
-            ladder = self.ladder_for(offer["side"])
+            ladder = self.ladder_for_offer(offer)
             y_px = ladder.tick_y(band, tick)
             tf = crop_transform(offer["box"], offer["frame_wh"])
             frac = frame_y_to_frac(y_px, tf)
@@ -1117,7 +1146,7 @@ class FeedbackManager:
             im = Image.open(frame_path).convert("RGB")
             fw, fh = im.size
             x1, y1, x2, y2 = expand_box(offer["box"], fw, fh)
-            ladder = self.ladder_for(offer["side"])
+            ladder = self.ladder_for_offer(offer)
             if band is None:
                 cy1, cy2 = y1, y2
             else:  # screen 2: the band window with vertical context
