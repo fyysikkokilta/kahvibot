@@ -45,6 +45,9 @@ coffee_reader_log = "/home/pi/coffee-reader/readings.jsonl"
 # it; the bot waits at most 5 s and then takes the photo anyway.
 camera_lock = ""
 
+# Show /graph (today's coffee level curve). Needs coffee_reader_log data.
+coffee_graph_enabled = False
+
 
 # if a message contains any of these words, the bot responds
 trigger_words = [

@@ -72,6 +72,8 @@ coffee_reader_log = getattr(_config, "coffee_reader_log", "")
 # Advisory camera lock shared with the background sampler. Empty string
 # (the default) is byte-for-byte today's behaviour: no lock, no sampler.
 camera_lock = getattr(_config, "camera_lock", "")
+# /graph: today's level curve. Off by default (GRAPHS.md §8 step 4).
+coffee_graph_enabled = getattr(_config, "coffee_graph_enabled", False)
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -82,6 +84,7 @@ logger.setLevel(logging.INFO)
 HELP_TEXT_FMT = """
 Komennot / commands:
 /status - Näytä kahvin määrä kiltiksellä tällä hetkellä / Show the current amount of coffee at the guild room
+/graph - Näytä kahvin määrä päivän aikana / Show today's coffee level over time
 /help - Näytä tämä viesti / Show this message
 
 Onko jokin vialla? Onko sinulla parannusehdotus? Ota yhteyttä ylläpitäjään {0}.
@@ -265,6 +268,36 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
         msg.reply_photo(bio, caption=caption)
 
 
+def send_graph(update: Update, ctx: CallbackContext):
+    """
+    /graph - today's coffee level as a picture. The failure discipline is
+    read_coffee_level()'s: any exception degrades to a text reply, because a
+    broken graph must never take out the bot.
+    """
+    msg = update.message
+    if msg is None:
+        return
+    if not coffee_graph_enabled:
+        return  # feature off: stay silent, same as any unknown command
+    try:
+        import graphs
+        png, caption = graphs.graph_reply(coffee_reader_log)
+    except Exception:
+        logger.warning("graph render failed", exc_info=True)
+        png = None
+        caption = ("Kuvaajan piirto epäonnistui. Kokeile hetken päästä uudelleen.\n"
+                   "Couldn't draw the graph. Try again in a moment.")
+    if png is None:
+        msg.reply_text(caption)
+        return
+    msg.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
+    bio = BytesIO()
+    bio.write(png)
+    bio.name = "graph.png"
+    bio.seek(0)
+    msg.reply_photo(bio, caption=caption)
+
+
 def error_callback(update, context):
     logger.error("Caught exception")
     logger.error("", exc_info=True)
@@ -293,6 +326,8 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler("start", send_help))
     dispatcher.add_handler(CommandHandler("help", send_help))
     dispatcher.add_handler(CommandHandler("status", send_webcam_photo))
+    dispatcher.add_handler(CommandHandler("graph", send_graph))
+    dispatcher.add_handler(CommandHandler("kuvaaja", send_graph))
     trigger_words_regex = re.compile("|".join(trigger_words), re.IGNORECASE)
     dispatcher.add_handler(MessageHandler(Filters.text & Filters.regex(trigger_words_regex), send_webcam_photo))
     dispatcher.add_error_handler(error_callback)
