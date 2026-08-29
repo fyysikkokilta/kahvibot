@@ -36,6 +36,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackContext,
+    CallbackQueryHandler,
     Filters,
 )
 import random
@@ -81,10 +82,21 @@ log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
+# Annotation surveys (UX_FEEDBACK.md). None whenever disabled or misconfigured,
+# and every hook below no-ops on None - the photo always goes out regardless.
+try:
+    import feedback as _feedback
+    survey = _feedback.FeedbackManager.from_config(_config, logger)
+except Exception:
+    logger.warning("survey module unavailable", exc_info=True)
+    survey = None
+
 HELP_TEXT_FMT = """
 Komennot / commands:
 /status - Näytä kahvin määrä kiltiksellä tällä hetkellä / Show the current amount of coffee at the guild room
 /graph - Näytä kahvin määrä päivän aikana / Show today's coffee level over time
+/merkkaa - Merkitse kahvin pinta yhteen kuvaan / Mark the coffee surface on one photo
+/eikiitos - Älä kysy minulta enää / Stop asking me
 /help - Näytä tämä viesti / Show this message
 
 Onko jokin vialla? Onko sinulla parannusehdotus? Ota yhteyttä ylläpitäjään {0}.
@@ -130,6 +142,14 @@ def send_help(update: Update, ctx: CallbackContext):
     msg = update.message
     if msg:
         msg.reply_text(ctx.bot.help_text)
+
+
+def start_router(update: Update, ctx: CallbackContext):
+    # A deep-linked "/start s<token>" opens a survey in this private chat;
+    # every other /start is plain help, exactly as before.
+    if survey and survey.on_start(update, ctx):
+        return
+    send_help(update, ctx)
 
 
 def read_coffee_level(image_path: str) -> Optional[dict]:
@@ -199,11 +219,12 @@ def format_reading(record: dict) -> str:
     return "\n".join(lines)
 
 
-def take_picture() -> "tuple[Image, Optional[dict]]":
+def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     """
     Take picture from webcamera using the fswebcam command and return it as a
     pillow image, plus the coffee level reading (or None) measured from the
-    frame on disk before it is watermarked or re-encoded.
+    frame on disk before it is watermarked or re-encoded, plus the raw
+    pre-watermark JPEG bytes (the survey caches the frame the reader saw).
     """
     with NamedTemporaryFile(suffix=".jpg") as f:
         # Use the option "-S 20" to discard 20 frames before taking the picture,
@@ -234,7 +255,9 @@ def take_picture() -> "tuple[Image, Optional[dict]]":
             subprocess.run(cmd, check=True)
         img = Image.open(f.name)
         reading = read_coffee_level(f.name)
-    return img, reading
+        with open(f.name, "rb") as fh:
+            raw = fh.read()
+    return img, reading, raw
 
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
@@ -242,7 +265,7 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
 
     update.message.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
-    img, reading = take_picture()
+    img, reading, raw = take_picture()
 
     if bot.watermark is not None:
         # Use the watermark image as the mask as well, so it's alpha channel is
@@ -263,9 +286,18 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     if coffee_reader_show and reading is not None:
         caption = format_reading(reading) or None
 
+    offer = markup = None
+    if survey and update.effective_user:
+        offer = survey.maybe_offer(update.effective_user.id, reading)
+        extra, markup = survey.decorate(offer, reading_shown=bool(caption))
+        if extra:
+            caption = (caption + "\n\n" + extra) if caption else extra
+
     msg = update.message
     if msg:
-        msg.reply_photo(bio, caption=caption)
+        sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
+        if survey:
+            survey.register_photo(sent, raw, reading, offer)
 
 
 def send_graph(update: Update, ctx: CallbackContext):
@@ -323,11 +355,19 @@ if __name__ == "__main__":
     updater = Updater(bot=bot, use_context=True)
 
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", send_help))
+    dispatcher.add_handler(CommandHandler("start", start_router))
     dispatcher.add_handler(CommandHandler("help", send_help))
     dispatcher.add_handler(CommandHandler("status", send_webcam_photo))
     dispatcher.add_handler(CommandHandler("graph", send_graph))
     dispatcher.add_handler(CommandHandler("kuvaaja", send_graph))
+    if survey:
+        # Survey handlers must sit above any Filters.text catch-all: within
+        # one group the first matching handler wins.
+        dispatcher.add_handler(CallbackQueryHandler(survey.on_callback, pattern=r"^fb\|"))
+        dispatcher.add_handler(CommandHandler("merkkaa", survey.on_merkkaa))
+        dispatcher.add_handler(CommandHandler("eikiitos", survey.on_eikiitos))
+        dispatcher.add_handler(CommandHandler("kahvistatsit", survey.on_stats))
+        survey.schedule_jobs(updater.job_queue)
     trigger_words_regex = re.compile("|".join(trigger_words), re.IGNORECASE)
     dispatcher.add_handler(MessageHandler(Filters.text & Filters.regex(trigger_words_regex), send_webcam_photo))
     dispatcher.add_error_handler(error_callback)

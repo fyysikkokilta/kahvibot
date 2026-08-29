@@ -48,6 +48,26 @@ camera_lock = ""
 # Show /graph (today's coffee level curve). Needs coffee_reader_log data.
 coffee_graph_enabled = False
 
+# --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
+coffee_survey_enabled = False
+coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @
+coffee_survey_dir = "/home/konsta/coffee-reader/survey"
+coffee_survey_reader_dir = "/home/konsta/coffee-reader"  # calibration.json (optional)
+# Ladder span per side, FRAME pixels: median y_base/y_top of the desktop
+# annotations per side (n=98 left / 159 right, era hd2026). NEVER from
+# per-frame model output - that would anchor the ladder.
+coffee_survey_span = {"left":  {"base": 568.4, "top": 206.3},
+                      "right": {"base": 554.1, "top": 222.6}}
+coffee_survey_span_source = "per_side_const_v1"
+coffee_survey_rate = 8            # target prompts/day (probability = rate/eligible users)
+coffee_survey_blind_frac = 0.25   # fraction of prompts served from the blind pool
+coffee_survey_daily_cap = 15      # global prompts/day
+coffee_survey_volunteer_cap = 5   # volunteered surveys/user/day
+coffee_survey_eval_day_salt = "coffee10-blind-v1"  # MUST match inject_hand_lines salt
+coffee_survey_frames_dir = ""     # sampler retained-frame ring (stem.jpg + stem.json)
+coffee_survey_sentinel_dir = ""   # desktop-annotated frames + sentinel_lines.json
+coffee_survey_admin_chat = 0      # nightly tg_clicks gzip goes here; 0 = off
+
 
 # if a message contains any of these words, the bot responds
 trigger_words = [
