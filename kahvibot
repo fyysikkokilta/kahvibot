@@ -50,6 +50,26 @@ from config import (
     trigger_words,
 )
 
+# Coffee level reader (optional, defaults keep the bot exactly as before).
+# The reader is a separate short-lived subprocess so that nothing about it -
+# a missing model file, a crash, an OOM - can take the bot down: any failure
+# just means this photo goes out without a reading, like every photo did
+# before the reader existed.
+import config as _config
+import json
+from datetime import datetime, timezone
+
+# Command to run, e.g. ["/home/pi/coffee-reader/venv/bin/python",
+#                       "/home/pi/coffee-reader/read_frame.py"].
+# Empty list = reader disabled.
+coffee_reader_cmd = getattr(_config, "coffee_reader_cmd", [])
+coffee_reader_timeout = getattr(_config, "coffee_reader_timeout", 30)
+# Show the reading to users. Keep False for the burn-in period: readings are
+# still logged, so drift can be caught before anything is user-visible.
+coffee_reader_show = getattr(_config, "coffee_reader_show", False)
+# JSONL log of every reading (empty string disables logging).
+coffee_reader_log = getattr(_config, "coffee_reader_log", "")
+
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
 log_handler.setFormatter(logging.Formatter("%(module)s[%(process)s]: %(message)s"))
@@ -106,10 +126,78 @@ def send_help(update: Update, ctx: CallbackContext):
         msg.reply_text(ctx.bot.help_text)
 
 
-def take_picture() -> Image:
+def read_coffee_level(image_path: str) -> Optional[dict]:
+    """
+    Run the coffee level reader on the captured frame, if configured.
+
+    Returns the parsed reading record, or None. None is the *normal* answer
+    for any kind of trouble - reader not configured, subprocess died, timed
+    out, printed garbage - because the bot's product is the photo and a
+    missing number must never block it.
+    """
+    if not coffee_reader_cmd:
+        return None
+    record = None
+    try:
+        proc = subprocess.run(
+            list(coffee_reader_cmd) + [image_path],
+            capture_output=True, text=True, timeout=coffee_reader_timeout,
+        )
+        record = json.loads(proc.stdout.strip().splitlines()[-1])
+    except Exception:
+        logger.warning("coffee reader failed", exc_info=True)
+    # Log failures too, not just successes: the burn-in question is "what
+    # fraction of photos yields a reading", and a log that only sees successes
+    # cannot answer it. The log path is a strftime pattern, so a value like
+    # "readings-%Y-%m.jsonl" rotates monthly for free (a plain path, having no
+    # % codes, passes through strftime unchanged).
+    if coffee_reader_log:
+        entry = record if isinstance(record, dict) else {"error": "reader produced no JSON"}
+        entry.setdefault("captured_at",
+                         datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        try:
+            with open(datetime.now().strftime(coffee_reader_log), "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry) + "\n")
+        except OSError:
+            logger.warning("coffee reader log write failed", exc_info=True)
+    if not isinstance(record, dict) or "pots" not in record:
+        return None
+    return record
+
+
+# Display names for the two camera-frame sides.
+POT_NAMES = {"left": "vasen pannu / left pot", "right": "oikea pannu / right pot"}
+
+
+def format_reading(record: dict) -> str:
+    """
+    One caption line per detected pot, honest about precision: the model's
+    median error is ~29 ml, so volumes are phrased as cups to the nearest
+    half (a half cup is 62 ml) and never as exact millilitres. A pot whose
+    surface the model can't see gets a "can't tell", which is a correct
+    answer, not a failure.
+    """
+    lines = []
+    for pot in record.get("pots", []):
+        name = POT_NAMES.get(pot.get("side"), pot.get("side", "?"))
+        if pot.get("ok") and pot.get("volume_ml") is not None:
+            half_cups = round(pot["volume_ml"] / 62.5) / 2
+            if half_cups <= 0:
+                amount = "tyhjä / empty"
+            else:
+                cups = ("%g" % half_cups).replace(".5", "½")
+                amount = f"~{cups} kuppia / cups"
+            lines.append(f"☕ {name}: {amount}")
+        else:
+            lines.append(f"☕ {name}: en näe pintaa / can't tell")
+    return "\n".join(lines)
+
+
+def take_picture() -> "tuple[Image, Optional[dict]]":
     """
     Take picture from webcamera using the fswebcam command and return it as a
-    pillow image.
+    pillow image, plus the coffee level reading (or None) measured from the
+    frame on disk before it is watermarked or re-encoded.
     """
     with NamedTemporaryFile(suffix=".jpg") as f:
         # Use the option "-S 20" to discard 20 frames before taking the picture,
@@ -125,7 +213,8 @@ def take_picture() -> Image:
         w, h = camera_dimensions
         subprocess.run(["fswebcam", "--quiet", "-S", "20", "--no-banner", "--resolution", f"{w}x{h}", f.name], check=True)
         img = Image.open(f.name)
-    return img
+        reading = read_coffee_level(f.name)
+    return img, reading
 
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
@@ -133,7 +222,7 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
 
     update.message.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
-    img = take_picture()
+    img, reading = take_picture()
 
     if bot.watermark is not None:
         # Use the watermark image as the mask as well, so it's alpha channel is
@@ -149,9 +238,14 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.name = "image.jpg"
     img.save(bio, "JPEG")
     bio.seek(0)
+
+    caption = None
+    if coffee_reader_show and reading is not None:
+        caption = format_reading(reading) or None
+
     msg = update.message
     if msg:
-        msg.reply_photo(bio)
+        msg.reply_photo(bio, caption=caption)
 
 
 def error_callback(update, context):
