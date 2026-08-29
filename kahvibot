@@ -69,6 +69,9 @@ coffee_reader_timeout = getattr(_config, "coffee_reader_timeout", 30)
 coffee_reader_show = getattr(_config, "coffee_reader_show", False)
 # JSONL log of every reading (empty string disables logging).
 coffee_reader_log = getattr(_config, "coffee_reader_log", "")
+# Advisory camera lock shared with the background sampler. Empty string
+# (the default) is byte-for-byte today's behaviour: no lock, no sampler.
+camera_lock = getattr(_config, "camera_lock", "")
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -211,7 +214,21 @@ def take_picture() -> "tuple[Image, Optional[dict]]":
         # from the Image.open() call below if taking the picture fails, even
         # with check=True ...
         w, h = camera_dimensions
-        subprocess.run(["fswebcam", "--quiet", "-S", "20", "--no-banner", "--resolution", f"{w}x{h}", f.name], check=True)
+        cmd = ["fswebcam", "--quiet", "-S", "20", "--no-banner",
+               "--resolution", f"{w}x{h}", f.name]
+        if camera_lock:
+            # The sampler may be mid-capture: wait briefly for the shared
+            # lock, then take the shot anyway - the user's photo is never
+            # gated on the lock, a missing flock binary, or a wedged sampler.
+            try:
+                locked = subprocess.run(["flock", "-w", "5", camera_lock] + cmd)
+            except OSError:
+                subprocess.run(cmd, check=True)
+            else:
+                if locked.returncode != 0:
+                    subprocess.run(cmd, check=True)
+        else:
+            subprocess.run(cmd, check=True)
         img = Image.open(f.name)
         reading = read_coffee_level(f.name)
     return img, reading

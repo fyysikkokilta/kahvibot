@@ -40,6 +40,12 @@ coffee_reader_show = False
 # JSONL file that every reading is appended to ("" disables logging).
 coffee_reader_log = "/home/pi/coffee-reader/readings.jsonl"
 
+# Advisory camera lock shared with the background sampler ("" = no lock,
+# exactly today's behaviour). The sampler skips its tick while the bot holds
+# it; the bot waits at most 5 s and then takes the photo anyway.
+camera_lock = ""
+
+
 # if a message contains any of these words, the bot responds
 trigger_words = [
     "kahvi",
