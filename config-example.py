@@ -21,6 +21,25 @@ camera_dimensions = (1280, 720)
 watermark_path = ""
 
 
+# --- Coffee level reader (optional) -----------------------------------------
+# Runs a small ONNX model on each captured frame in a short-lived subprocess
+# and (optionally) captions the photo with the amount of coffee. Any failure
+# in the reader silently degrades to "no reading"; the photo always goes out.
+
+# Command that runs the reader; the frame path is appended. Empty = disabled.
+# e.g. ["/home/pi/coffee-reader/venv/bin/python", "/home/pi/coffee-reader/read_frame.py"]
+coffee_reader_cmd = []
+
+# Seconds to wait for the reader before giving up on this frame.
+coffee_reader_timeout = 30
+
+# Show readings to users. Keep False for the burn-in week: readings are still
+# written to coffee_reader_log, so drift can be caught before going visible.
+coffee_reader_show = False
+
+# JSONL file that every reading is appended to ("" disables logging).
+coffee_reader_log = "/home/pi/coffee-reader/readings.jsonl"
+
 # if a message contains any of these words, the bot responds
 trigger_words = [
     "kahvi",
