@@ -94,8 +94,8 @@ except Exception:
 HELP_TEXT_FMT = """
 Komennot / commands:
 /status - Näytä kahvin määrä kiltiksellä tällä hetkellä / Show the current amount of coffee at the guild room
-/graph - Näytä kahvin määrä päivän aikana / Show today's coffee level over time
-/merkkaa - Merkitse kahvin pinta yhteen kuvaan / Mark the coffee surface on one photo
+/graph - Näytä päivän kahvitilanne kuvaajana / Show today's coffee level over time
+/merkkaa - Merkitse kahvin pinta kuvaan / Mark the coffee surface on a photo
 /eikiitos - Älä kysy minulta enää / Stop asking me
 /help - Näytä tämä viesti / Show this message
 
@@ -211,8 +211,10 @@ def format_reading(record: dict) -> str:
             if half_cups <= 0:
                 amount = "tyhjä / empty"
             else:
-                cups = ("%g" % half_cups).replace(".5", "½")
-                amount = f"~{cups} kuppia / cups"
+                whole = int(half_cups)
+                cups = (str(whole) if whole else "") + ("½" if half_cups != whole else "")
+                unit = "kuppi / cup" if half_cups == 1.0 else "kuppia / cups"
+                amount = f"~{cups} {unit}"
             lines.append(f"☕ {name}: {amount}")
         else:
             lines.append(f"☕ {name}: en näe pintaa / can't tell")

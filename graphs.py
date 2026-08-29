@@ -265,7 +265,7 @@ def _ago(delta):
 def _brew_phrase(day, fi):
     brew = day.latest_brew()
     if brew is None:
-        return "ei havaittua keittoa tänään" if fi else "no brew detected today"
+        return "ei havaittua kahvinkeittoa tänään" if fi else "no brew detected today"
     t0, t1 = brew
     if (t1 - t0) < timedelta(minutes=30):
         mid = t0 + (t1 - t0) / 2
@@ -312,15 +312,15 @@ TEXT_FAILED = ("Kuvaajan piirto epäonnistui. Kokeile hetken päästä uudelleen
 
 def _text_not_enough(n_readable):
     if n_readable == 1:
-        fi_head = "Tänään on vain 1 luettava lukema, mikä ei riitä kuvaajaan."
+        fi_head = "Tänään on vasta 1 kelvollinen lukema, eikä se riitä kuvaajaan."
         en_head = "Only 1 readable reading today — not enough for a graph."
     else:
-        fi_head = ("Tänään on vain %d luettavaa lukemaa, mikä ei riitä kuvaajaan."
+        fi_head = ("Tänään on vasta %d kelvollista lukemaa, eikä se riitä kuvaajaan."
                    % n_readable)
         en_head = ("Only %d readable readings today — not enough for a graph."
                    % n_readable)
     return (fi_head
-            + "\nKuvaaja piirtyy kun päivälle kertyy vähintään 3 lukemaa yli tunnin ajalta."
+            + "\nKuvaaja piirtyy, kun päivältä on vähintään 3 lukemaa yli tunnin ajalta."
             + "\nPyydä /status useammin, niin kuvaajakin täyttyy."
             + "\n\n" + en_head
             + "\nA graph needs at least 3 readings spanning at least an hour."

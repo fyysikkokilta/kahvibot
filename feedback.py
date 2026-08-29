@@ -146,19 +146,20 @@ class Ladder:
 # --------------------------------------------------------------------------
 
 TXT_PROMPT_CAPTION = (
-    "Ehtisitkö 10 sekuntia? Merkitse kahvin pinta, niin kone oppii lukemaan pannun.\n"
+    "Onko sinulla 10 sekuntia? Merkitse kahvin pinta, niin kone oppii lukemaan pannua.\n"
     "Got 10 seconds? Mark the coffee surface and the machine learns to read the pot."
 )
 BTN_HELP = "✋ Autan / I'll help"
 BTN_WRONG = "✏️ Väärin? / Wrong?"
 BTN_CANT_SEE = "🙈 En näe pintaa / Can't see it"
+BTN_EMPTY = "🫙 Tyhjä / Empty"
 BTN_SKIP = "⏭ Ohita / Skip"
 BTN_BACK = "↩ Takaisin / Back"
 
 TXT_SCREEN1_ASSISTED = (
     "{pot}, {hhmm}\n\n"
     "Missä kahvin pinta on? Valitse numero, joka on lähinnä pinnan ETUREUNAA - "
-    "sitä kohtaa, jossa kahvi koskettaa lasia sinua kohti.\n"
+    "siis kohtaa, jossa pinta osuu lasin etuseinään.\n"
     "Katkoviiva on koneen arvaus.\n\n"
     "Where is the coffee surface? Pick the number nearest the FRONT EDGE of the "
     "surface - where the coffee meets the glass nearest you.\n"
@@ -193,10 +194,10 @@ TXT_ALREADY_TODAY = (
     "You already had a survey today - thanks! Try again tomorrow."
 )
 TXT_CONSENT = (
-    "Tämä on kahvibotin merkintäkysely. Tallennan vain: mihin napautit, mistä\n"
-    "kuvasta, ja tunnisteen käyttäjä-ID:stäsi (yksisuuntainen tiiviste - ei nimeä,\n"
-    "ei viestejä). Kuvat ovat samoja, jotka botti on jo lähettänyt kiltiksen\n"
-    "ryhmään. Lopeta milloin vain: /eikiitos\n\n"
+    "Tämä on kahvibotin merkintäkysely. Tallennan vain sen, mihin napautit,\n"
+    "mistä kuvasta ja käyttäjä-ID:stäsi lasketun tunnisteen (yksisuuntainen\n"
+    "tiiviste - ei nimeä, ei viestejä). Kuvat ovat samoja, jotka botti on jo\n"
+    "lähettänyt kiltiksen ryhmään. Lopeta milloin vain: /eikiitos\n\n"
     "This is the kahvibot annotation survey. Stored: where you tapped, which photo,\n"
     "and a one-way hash of your user ID - not your name, not your messages. The\n"
     "photos are the ones the bot has already posted to the guild chat.\n"
@@ -207,26 +208,36 @@ TXT_OPTED_OUT = (
     "Understood, no more prompts. Volunteering still works: /merkkaa"
 )
 TXT_NO_FRAME = (
-    "Ei tuoretta kuvaa merkittäväksi juuri nyt - pyydä ensin /status ryhmässä.\n"
+    "Ei tuoretta kuvaa merkittäväksi juuri nyt - lähetä ensin /status ryhmään.\n"
     "No fresh photo to annotate right now - ask for /status in the group first."
 )
 TXT_EXPIRED = (
-    "Tämä kysely ehti vanhentua. Uusi tulee kuvien mukana!\n"
+    "Tämä kysely ehti vanhentua. Uusi tulee seuraavien kuvien mukana!\n"
     "This survey expired. A new one rides on the next photos!"
 )
+TXT_EMPTY_THANKS = (
+    "Kiitos! Tyhjä pannu - sekin on täsmällinen vastaus.\n"
+    "Thanks! An empty pot is a precise answer too."
+)
 HELP_EXTRA = (
-    "/merkkaa - Merkitse kahvin pinta yhteen kuvaan / Mark the coffee surface on one photo\n"
+    "/merkkaa - Merkitse kahvin pinta kuvaan / Mark the coffee surface on a photo\n"
     "/eikiitos - Älä kysy minulta enää / Stop asking me"
 )
 
 POT_NAMES = {"left": "Vasen pannu / left pot", "right": "Oikea pannu / right pot"}
 
 
-def _half_cups(ml: float) -> str:
+def _cups_phrase(ml: float, fi: bool) -> str:
+    """Half-cup phrasing with the singular and the bare half done right
+    ("½ kuppia", "~1 kuppi", "~1½ kuppia" - never "0½" or "1 kuppia")."""
     hc = round(ml / 62.5) / 2
     if hc <= 0:
-        return "tyhjä / empty"
-    return "~" + ("%g" % hc).replace(".5", "½")
+        return "tyhjä" if fi else "empty"
+    whole = int(hc)
+    s = (str(whole) if whole else "") + ("½" if hc != whole else "")
+    if hc == 1.0:
+        return "~1 kuppi" if fi else "~1 cup"
+    return ("~%s kuppia" % s) if fi else ("~%s cups" % s)
 
 
 # --------------------------------------------------------------------------
@@ -283,6 +294,7 @@ def make_record(offer: Dict[str, Any], answered: Dict[str, Any]) -> Dict[str, An
         "n_taps": answered.get("n_taps"),
         "band": answered.get("band"),
         "tick": answered.get("tick"),
+        "empty": bool(answered.get("empty")),
         "bot_version": offer.get("bot_version", "kahvibot+feedback/1"),
         "reader_version": offer.get("reader_version"),
     }
@@ -833,7 +845,8 @@ class FeedbackManager:
             from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup
             rows = [[B(str(n), callback_data="fb|%s|a|%d" % (offer["token"], n))
                      for n in range(r, r + 4)] for r in (1, 5, 9)]
-            rows.append([B(BTN_CANT_SEE, callback_data="fb|%s|x" % offer["token"])])
+            rows.append([B(BTN_EMPTY, callback_data="fb|%s|e" % offer["token"]),
+                         B(BTN_CANT_SEE, callback_data="fb|%s|x" % offer["token"])])
             rows.append([B(BTN_SKIP, callback_data="fb|%s|k" % offer["token"])])
             m = context.bot.send_photo(chat_id=chat.id, photo=io.BytesIO(img),
                                        caption=caption[:1024],
@@ -897,6 +910,8 @@ class FeedbackManager:
                 self._finish(q, context, offer, offer.get("band", 6), int(parts[3]))
             elif action == "b":                     # back to screen 1
                 self._back_to_screen1(q, context, offer)
+            elif action == "e":                     # pot is empty
+                self._finish(q, context, offer, None, None, empty=True)
             elif action == "x":                     # can't see it
                 self._finish(q, context, offer, None, None, visible=False)
             elif action == "k":                     # skip
@@ -947,7 +962,8 @@ class FeedbackManager:
             tmpl = TXT_SCREEN1_BLIND if offer.get("blind") else TXT_SCREEN1_ASSISTED
             rows = [[B(str(n), callback_data="fb|%s|a|%d" % (offer["token"], n))
                      for n in range(r, r + 4)] for r in (1, 5, 9)]
-            rows.append([B(BTN_CANT_SEE, callback_data="fb|%s|x" % offer["token"])])
+            rows.append([B(BTN_EMPTY, callback_data="fb|%s|e" % offer["token"]),
+                         B(BTN_CANT_SEE, callback_data="fb|%s|x" % offer["token"])])
             rows.append([B(BTN_SKIP, callback_data="fb|%s|k" % offer["token"])])
             q.edit_message_media(
                 media=InputMediaPhoto(io.BytesIO(img),
@@ -959,15 +975,24 @@ class FeedbackManager:
 
     def _finish(self, q, context, offer: Dict[str, Any],
                 band: Optional[int], tick: Optional[int],
-                visible: bool = True) -> None:
+                visible: bool = True, empty: bool = False) -> None:
         now = time.time()
         y_px = frac = None
-        if visible and band and tick:
+        if empty:
+            # "Empty" is a real label, not an abstention: the surface sits at
+            # the glass base, one tap instead of two.
+            ladder = self.ladder_for_offer(offer)
+            if ladder is not None:
+                y_px = ladder.y_base
+                tf = crop_transform(offer["box"], offer["frame_wh"])
+                frac = frame_y_to_frac(y_px, tf)
+        elif visible and band and tick:
             ladder = self.ladder_for_offer(offer)
             y_px = ladder.tick_y(band, tick)
             tf = crop_transform(offer["box"], offer["frame_wh"])
             frac = frame_y_to_frac(y_px, tf)
         answered = {
+            "empty": bool(empty),
             "answering_user_hash": offer.get("answering_user"),
             "answered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "answered_at_s": now,
@@ -1001,7 +1026,7 @@ class FeedbackManager:
         self.state.d["offers"].pop(offer.get("token", ""), None)
         self.state.save()
 
-        text = self._confirmation(offer, y_px, visible)
+        text = TXT_EMPTY_THANKS if empty else self._confirmation(offer, y_px, visible)
         try:
             q.answer()
             q.edit_message_caption(caption=text[:1024])
@@ -1026,8 +1051,8 @@ class FeedbackManager:
             d = ml_you - ml_m
             if offer.get("blind"):
                 return TXT_THANKS_BLIND.format(
-                    you=_half_cups(ml_you) + " kuppia", machine=_half_cups(ml_m) + " kuppia",
-                    you_en=_half_cups(ml_you) + " cups", machine_en=_half_cups(ml_m) + " cups",
+                    you=_cups_phrase(ml_you, True), machine=_cups_phrase(ml_m, True),
+                    you_en=_cups_phrase(ml_you, False), machine_en=_cups_phrase(ml_m, False),
                     ml=int(round(abs(d))))
             if abs(d) < 10:
                 fi = "lähes samaan kohtaan kuin kone"
@@ -1039,7 +1064,8 @@ class FeedbackManager:
                 fi = "%d ml koneen arvausta ylemmäs" % int(round(d))
                 en = "%d ml above the machine's guess" % int(round(d))
             return TXT_THANKS_ASSISTED.format(fi_delta=fi, en_delta=en)
-        return "Kiitos! (%s kuppia / cups)" % _half_cups(ml_you)
+        return "Kiitos! / Thanks! (%s / %s)" % (
+            _cups_phrase(ml_you, True), _cups_phrase(ml_you, False))
 
     # ======================================================================
     # 3. commands: /merkkaa /eikiitos /kahvistatsit
