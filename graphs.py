@@ -76,7 +76,22 @@ def _parse_ts(s):
 
 def _record_time(rec):
     # §7.1: captured_at, falling back to read_at. Never the file stem.
-    return _parse_ts(rec.get("captured_at")) or _parse_ts(rec.get("read_at"))
+    # "t" is the 10 s sampler's slim-record timestamp.
+    return (_parse_ts(rec.get("captured_at")) or _parse_ts(rec.get("read_at"))
+            or _parse_ts(rec.get("t")))
+
+
+def _normalize(rec):
+    """Widen the 10 s sampler's slim records ({"t":..., "pots":[{"s","ok","ml",
+    "h","e","d"}]}, abbreviated to keep its ~1.4 MB/day budget) to the bot's
+    field names, so the rest of the module sees a single schema."""
+    pots = rec.get("pots")
+    if isinstance(pots, list):
+        for p in pots:
+            if isinstance(p, dict) and "side" not in p and "s" in p:
+                p["side"] = p.get("s")
+                p["volume_ml"] = p.get("ml")
+    return rec
 
 
 def _tail_lines(path, cutoff_utc, chunk=256 * 1024, max_bytes=32 * 1024 * 1024):
@@ -143,11 +158,14 @@ def load_today(log_pattern, now_utc):
             continue
         if not isinstance(rec, dict):
             continue
+        if rec.get("src") == "sampler" and not rec.get("pots"):
+            continue   # sampler state ticks (dark backoff etc.): not photos
         t = _record_time(rec)
         if t is None:
             continue
         if t.astimezone().date() != now_local.date():
             continue
+        rec = _normalize(rec)
         rec["_t"] = t
         records.append(rec)
     records.sort(key=lambda r: r["_t"])
@@ -271,10 +289,10 @@ def _brew_phrase(day, fi):
         mid = t0 + (t1 - t0) / 2
         ago = _ago(day.now_utc - mid)
         if fi:
-            return "viimeisin keitto n. klo %s (%s sitten)" % (_hhmm(mid), ago)
+            return "viimeisin kahvinkeitto n. klo %s (%s sitten)" % (_hhmm(mid), ago)
         return "last brew ~%s (%s ago)" % (_hhmm(mid), ago)
     if fi:
-        return "viimeisin havaittu keitto klo %s–%s" % (_hhmm(t0), _hhmm(t1))
+        return "viimeisin havaittu kahvinkeitto klo %s–%s" % (_hhmm(t0), _hhmm(t1))
     return "last brew detected between %s and %s" % (_hhmm(t0), _hhmm(t1))
 
 
@@ -544,7 +562,7 @@ def render_day_graph(day, font_dir=None):
                             now_local.day, now_local.month)
     _text(draw, (976, 34), date_s, fonts["body"], TEXT_DIM, anchor="rs")
     _text(draw, (24, 62),
-          "%d luettavaa lukemaa %d kuvasta · %d readable of %d photos"
+          "%d kelvollista lukemaa %d kuvasta · %d readable of %d photos"
           % (day.n_readable, day.n_photos, day.n_readable, day.n_photos),
           fonts["body"], TEXT_DIM)
     _text(draw, (16, 80), "kuppia", fonts["small"], TEXT_DIM)
@@ -552,8 +570,8 @@ def render_day_graph(day, font_dir=None):
 
     # row 1: what the lines are; row 2: what the marks are
     lx = 24
-    for side, label in (("left", "vasen levy / left plate"),
-                        ("right", "oikea levy / right plate")):
+    for side, label in (("left", "vasen pannu / left pot"),
+                        ("right", "oikea pannu / right pot")):
         draw.rectangle([lx, 578, lx + 22, 588], fill=COLOURS[side])
         suffix = "" if day.usable[side] else " (ei lukemia / no readings)"
         tw = _text(draw, (lx + 30, 588), label + suffix, fonts["body"], TEXT_BODY)
@@ -561,7 +579,7 @@ def render_day_graph(day, font_dir=None):
     lx = 24
     draw.rectangle([lx, 600, lx + 22, 610], fill=_rgba(BREW, 90))
     draw.rectangle([lx, 600, lx + 22, 602], fill=BREW)
-    tw = _text(draw, (lx + 30, 610), "havaittu keitto / brew detected",
+    tw = _text(draw, (lx + 30, 610), "kahvinkeitto / brew detected",
                fonts["body"], TEXT_BODY)
     lx += 30 + tw + 28
     draw.rectangle([lx + 4, 600, lx + 6, 610], fill=_rgba(COLOURS["left"], 140))
