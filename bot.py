@@ -68,6 +68,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Devices: {', '.join(DEVICES)}\n"
         "/brew — last brew info\n"
         "/help — this menu"
+        "plaintext parsing and"
+        "underscore contcatenation supported"
     )
     await context.bot.send_message(update.effective_chat.id, text)
 
@@ -83,10 +85,28 @@ async def run_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action:
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
+    words = text.split()
+    device = next((w for w in words if w in DEVICES), None)
+    if device:
+        context.args = [device]
     for action, pattern in ALIASES.items():
         if pattern.search(text):
             await run_action(update, context, action)
             return
+
+
+def _inline_device(update: Update) -> str:
+    return update.effective_message.text.split("_", 1)[1].lower()
+
+
+async def cmd_plot_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.args = [_inline_device(update)]
+    await cmd_plot(update, context)
+
+
+async def cmd_brew_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.args = [_inline_device(update)]
+    await cmd_brew(update, context)
 
 
 async def post_init(application: Application) -> None:
@@ -98,6 +118,9 @@ def main():
     app.add_handler(CommandHandler(["plot"], cmd_plot))
     app.add_handler(CommandHandler(["brew"], cmd_brew))
     app.add_handler(CommandHandler("help", cmd_help))
+    for device in DEVICES:
+        app.add_handler(CommandHandler(f"plot_{device}", cmd_plot_inline))
+        app.add_handler(CommandHandler(f"brew_{device}", cmd_brew_inline))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(COMBINED), handle_message))
     app.run_polling()
 

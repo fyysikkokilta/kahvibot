@@ -95,7 +95,8 @@ def test_brew_summary_ongoing_brew():
     }
     text = plot.brew_summary(brew, now=now)
     assert "brewing right now" in text
-    assert "950 W" in text
+    assert "30s" in text
+    assert "950 W" not in text
 
 
 def test_brew_summary_past_brew():
@@ -214,7 +215,7 @@ def test_plot_power_raises_when_all_data_too_old(tmp_path, monkeypatch):
     old = datetime.now() - timedelta(days=10)
     write_csv(plot.get_csv_path("oikea"), [(iso(old), 100)])
     with pytest.raises(FileNotFoundError):
-        plot.plot_power("oikea", hours=24)
+        plot.plot_power("oikea")
 
 
 def test_plot_power_writes_png_and_survives_bad_rows(tmp_path, monkeypatch):
@@ -227,6 +228,6 @@ def test_plot_power_writes_png_and_survives_bad_rows(tmp_path, monkeypatch):
     write_csv(plot.get_csv_path("oikea"), rows)
 
     out_png = tmp_path / "out.png"
-    result = plot.plot_power("oikea", out_png=out_png, hours=24)
+    result = plot.plot_power("oikea", out_png=out_png)
     assert result == out_png
     assert out_png.is_file()
