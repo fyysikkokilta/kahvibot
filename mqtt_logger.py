@@ -38,14 +38,18 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 
 def on_message(client, userdata, msg):
+    dev_name = DEVICES_BY_TOPIC.get(msg.topic)
+    if dev_name is None:
+        return
     try:
         payload = json.loads(msg.payload)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return
     power = payload.get("power")
-    if power is None:
+    try:
+        power = float(power)
+    except (TypeError, ValueError):
         return
-    dev_name = DEVICES_BY_TOPIC.get(msg.topic, msg.topic.split("/")[-1])
     path = csv_path(dev_name)
     ensure_csv(path)
     ts = datetime.now().isoformat()

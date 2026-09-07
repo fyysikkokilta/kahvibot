@@ -27,6 +27,12 @@ def pick_devices(context):
 
 async def cmd_plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for device in pick_devices(context):
+        if device not in DEVICES:
+            await context.bot.send_message(
+                update.effective_chat.id,
+                f"Unknown device '{device}'. Available: {', '.join(DEVICES)}",
+            )
+            continue
         csv_path = get_csv_path(device)
         if not csv_path.is_file():
             await context.bot.send_message(update.effective_chat.id, f"No data yet for {device}.")
@@ -44,6 +50,12 @@ async def cmd_plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for device in pick_devices(context):
+        if device not in DEVICES:
+            await context.bot.send_message(
+                update.effective_chat.id,
+                f"Unknown device '{device}'. Available: {', '.join(DEVICES)}",
+            )
+            continue
         await context.bot.send_message(
             update.effective_chat.id, f"{device}: {brew_summary(last_brew(device))}"
         )

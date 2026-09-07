@@ -28,3 +28,23 @@ DEFAULT_DEVICE = _env("DEFAULT_DEVICE", "oikea")
 BREW_THRESHOLD = float(_env("BREW_THRESHOLD", "300"))
 HEAT = float(_env("HEAT", "100"))
 PLOT_HOURS = float(_env("PLOT_HOURS", "24"))
+
+
+def _parse_calibration(raw):
+    points = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        secs, cups = part.split(":")
+        points.append((float(secs), float(cups)))
+    return points
+
+
+# Reference brews for estimating cup count from brew duration, as
+# "seconds:cups" pairs, e.g. "400:8,300:6". The Moccamaster draws roughly
+# constant power for as long as water is still passing through the filter, so
+# brew duration scales with the amount of water. One point assumes brewing
+# starts flowing water immediately (no fixed offset); two or more points are
+# fit with a line. Leave empty until you have measurements.
+CUP_CALIBRATION = _parse_calibration(_env("CUP_CALIBRATION", ""))

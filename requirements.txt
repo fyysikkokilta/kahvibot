@@ -2,4 +2,5 @@ python-telegram-bot
 paho-mqtt
 pandas
 matplotlib
+numpy
 pyparsing

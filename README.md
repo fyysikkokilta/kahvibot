@@ -9,6 +9,11 @@ Telegram bot that monitors coffee-machine power usage via MQTT and reports plots
 - **`bot.py`** — Telegram bot with `/plot`, `/brew`, `/help` commands plus keyword aliases (`kahvi`, `tsufe`, `brew`, `plot`, ...).
 - **`aliases.py`** — keyword patterns that trigger bot actions.
 
+Device names are validated against the configured `DEVICES` whitelist (bot) and
+against known MQTT topics (logger) before being used to build file paths, and
+`plot.py`'s `get_csv_path()` rejects any device name containing characters
+outside `[A-Za-z0-9_-]` as defense in depth.
+
 ## Setup
 
 1. Install dependencies:
@@ -52,9 +57,36 @@ Telegram bot that monitors coffee-machine power usage via MQTT and reports plots
 | `BREW_THRESHOLD` | `300` | W above which a brew starts |
 | `HEAT` | `100` | W below which a brew ends (hysteresis) |
 | `PLOT_HOURS` | `24` | Hours of history shown in plots |
+| `CUP_CALIBRATION` | (none) | Reference brews for cup-count estimation, as `seconds:cups` pairs (e.g. `400:8,300:6`) |
+
+### Cup-count estimation
+
+Moccamaster-style filter machines draw roughly constant power for as long as
+water is still passing through the filter, so brew duration scales with the
+amount of water brewed. Once you've measured a couple of reference brews
+(known cup count + observed duration from `/brew`), set `CUP_CALIBRATION` and
+`/brew` will report an estimated cup count alongside duration and peak power.
+
+- One point (`secs:cups`) assumes brewing starts immediately with no fixed
+  warm-up offset, i.e. cups scale linearly from zero.
+- Two or more points are fit with a line (`cups = slope * seconds + intercept`),
+  which also captures any fixed startup delay before water starts flowing.
+
+Leave unset until you have measurements — no cup estimate is shown without
+calibration.
 
 ## Bot commands
 
 - `/plot [device]` — power plot for a device
 - `/brew [device]` — last brew time/duration/peak
 - `/help` — available commands
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Tests use a stubbed `config` module (see `tests/conftest.py`) so no real `config.py`
+or MQTT/Telegram credentials are needed.
