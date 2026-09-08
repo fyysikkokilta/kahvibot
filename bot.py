@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -11,6 +14,14 @@ from telegram.ext import (
 from config import TELEGRAM_TOKEN, DEVICES
 from aliases import ALIASES, COMBINED
 from plot import get_csv_path, plot_power, last_brew, brew_summary
+
+logger = logging.getLogger("bot")
+
+try:
+    from config import ADMIN_CHAT_ID
+except ImportError:
+    ADMIN_CHAT_ID = None
+ADMIN_CHAT_ID = int(ADMIN_CHAT_ID) if str(ADMIN_CHAT_ID or "").strip().isdigit() else None
 
 COMMANDS = [
     ("plot", "Power plot for a device"),
@@ -39,13 +50,17 @@ async def cmd_plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             continue
         await context.bot.send_message(update.effective_chat.id, f"Generating plot for {device}...")
         try:
-            png_path = plot_power(device)
+            png_path = await asyncio.to_thread(plot_power, device)
+            caption = await asyncio.to_thread(_brew_caption, device)
         except FileNotFoundError:
             await context.bot.send_message(update.effective_chat.id, f"No recent data for {device}.")
             continue
-        caption = brew_summary(last_brew(device))
         with open(png_path, "rb") as f:
             await context.bot.send_photo(chat_id=update.effective_chat.id, photo=f, caption=caption)
+
+
+def _brew_caption(device):
+    return brew_summary(last_brew(device))
 
 
 async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,9 +71,8 @@ async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Unknown device '{device}'. Available: {', '.join(DEVICES)}",
             )
             continue
-        await context.bot.send_message(
-            update.effective_chat.id, f"{device}: {brew_summary(last_brew(device))}"
-        )
+        summary = await asyncio.to_thread(_brew_caption, device)
+        await context.bot.send_message(update.effective_chat.id, f"{device}: {summary}")
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,12 +123,34 @@ async def cmd_brew_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cmd_brew(update, context)
 
 
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Exception while handling an update:", exc_info=context.error)
+    if ADMIN_CHAT_ID:
+        try:
+            await context.bot.send_message(text=f"Bot error: {context.error}", chat_id=ADMIN_CHAT_ID)
+        except Exception:
+            logger.exception("Failed to notify admin")
+
+
 async def post_init(application: Application) -> None:
+    try:
+        me = await application.bot.get_me()
+    except Exception as exc:
+        logger.error("Failed to validate TELEGRAM_TOKEN: %s", exc)
+        raise RuntimeError(
+            f"Bot token failed validation (check TELEGRAM_TOKEN in config.py): {exc}"
+        ) from exc
+    logger.info("Bot online as @%s", me.username)
     await application.bot.set_my_commands(COMMANDS)
 
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(post_init).build()
+    app.add_error_handler(error_handler)
     app.add_handler(CommandHandler(["plot"], cmd_plot))
     app.add_handler(CommandHandler(["brew"], cmd_brew))
     app.add_handler(CommandHandler("help", cmd_help))

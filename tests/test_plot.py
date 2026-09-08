@@ -258,3 +258,76 @@ def test_plot_power_writes_png_and_survives_bad_rows(tmp_path, monkeypatch):
     result = plot.plot_power("oikea", out_png=out_png)
     assert result == out_png
     assert out_png.is_file()
+
+
+# --- timezone normalization & plot cache -------------------------------------
+
+
+def test_normalize_local_converts_aware_to_naive_local():
+    ser = pd.Series([pd.Timestamp("2026-09-07 12:00:00", tz="UTC")])
+    out = plot._normalize_local(ser)
+    assert out.iloc[0].tzinfo is None
+
+
+def test_normalize_local_mixed_keeps_naive_local():
+    ser = pd.Series(
+        [
+            pd.Timestamp("2026-09-07 12:00:00"),
+            pd.Timestamp("2026-09-07 12:00:00", tz="UTC"),
+        ]
+    )
+    out = plot._normalize_local(ser)
+    assert out.iloc[0].tzinfo is None
+    assert out.iloc[1].tzinfo is None
+
+
+def test_plot_power_handles_aware_utc_rows(tmp_path, monkeypatch):
+    from datetime import timezone
+
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    rows = [
+        (iso(datetime.now()), 10),  # legacy naive local row
+        (datetime.now(timezone.utc).isoformat(), 123),  # new aware UTC row
+    ]
+    write_csv(plot.get_csv_path("oikea"), rows)
+
+    out = tmp_path / "out.png"
+    assert plot.plot_power("oikea", out_png=out) == out
+    assert out.is_file()
+
+
+def test_plot_power_caches_render(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    now = datetime.now()
+    write_csv(plot.get_csv_path("oikea"), [(iso(now - timedelta(minutes=1)), 123)])
+    out = tmp_path / "out.png"
+    real = plot._render_power
+    calls = {"n": 0}
+
+    def spy(csv_path, device, out_png):
+        calls["n"] += 1
+        return real(csv_path, device, out_png)
+
+    monkeypatch.setattr(plot, "_render_power", spy)
+    plot.plot_power("oikea", out_png=out)
+    plot.plot_power("oikea", out_png=out)
+    assert calls["n"] == 1
+
+
+def test_plot_power_cache_invalidates_on_file_change(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    base = datetime.now() - timedelta(minutes=5)
+    write_csv(plot.get_csv_path("oikea"), [(iso(base), 123)])
+    out = tmp_path / "out.png"
+    real = plot._render_power
+    calls = {"n": 0}
+
+    def spy(csv_path, device, out_png):
+        calls["n"] += 1
+        return real(csv_path, device, out_png)
+
+    monkeypatch.setattr(plot, "_render_power", spy)
+    plot.plot_power("oikea", out_png=out)
+    write_csv(plot.get_csv_path("oikea"), [(iso(base), 123), (iso(datetime.now()), 200)])
+    plot.plot_power("oikea", out_png=out)
+    assert calls["n"] == 2

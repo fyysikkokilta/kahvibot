@@ -1,5 +1,7 @@
 import json
 import re
+import threading
+from datetime import datetime
 
 import matplotlib
 matplotlib.use("Agg")
@@ -34,6 +36,9 @@ BREW = "#2ca02c"
 DEVICE_COLORS = {"vasen": "#1f77b4", "oikea": "#e07b00"}
 
 CALIBRATION_FILE = "calibration.json"
+
+_plot_cache = {}
+_render_lock = threading.Lock()
 
 
 # --- brew-size calibration store ---------------------------------------------
@@ -113,6 +118,32 @@ def _hysteresis_events(df, start_threshold, end_threshold):
     return events
 
 
+def _normalize_local(ts):
+    """Return the series as naive local wall time.
+
+    mqtt_logger writes UTC timestamps with an explicit offset, while CSVs
+    written before that change hold naive local wall time. Convert any
+    tz-aware values to local wall time (dropping tzinfo) so comparisons
+    against naive ``pd.Timestamp.now()`` work regardless of the mix.
+    """
+    if ts.dtype == "object":
+        return ts.apply(_ts_to_local_naive)
+    if ts.dt.tz is not None:
+        return ts.dt.tz_convert(_localtz()).dt.tz_localize(None)
+    return ts
+
+
+def _localtz():
+    # stdlib: pd.Timestamp.now().astimezone() is broken on pandas 3.0
+    return datetime.now().astimezone().tzinfo
+
+
+def _ts_to_local_naive(ts):
+    if ts.tzinfo is None:
+        return ts
+    return ts.tz_convert(_localtz()).tz_localize(None)
+
+
 def detect_brews(device=DEFAULT_DEVICE, start_threshold=BREW_THRESHOLD, end_threshold=HEAT):
     csv_path = get_csv_path(device)
     if not csv_path.is_file():
@@ -121,6 +152,7 @@ def detect_brews(device=DEFAULT_DEVICE, start_threshold=BREW_THRESHOLD, end_thre
     if df.empty or "power" not in df.columns:
         return []
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df["timestamp"] = _normalize_local(df["timestamp"])
     df = df.dropna(subset=["timestamp"])
     if df.empty:
         return []
@@ -184,13 +216,32 @@ def brew_summary(brew, now=None):
 
 
 def plot_power(device=DEFAULT_DEVICE, out_png=None):
+    """Render (or return the cached) power plot for the device since midnight.
+
+    The plot is keyed on the CSV's mtime/size, so it is only re-rendered when
+    new rows arrive; repeated /plot calls reuse the same PNG.
+    """
     csv_path = get_csv_path(device)
     if not csv_path.is_file():
         raise FileNotFoundError(f"No data for {device}")
+    if out_png is None:
+        out_png = DATA_DIR / f"plot_{device}.png"
+    stat = csv_path.stat()
+    key = (str(csv_path), stat.st_mtime_ns, stat.st_size, str(out_png))
+    with _render_lock:
+        if key in _plot_cache:
+            return _plot_cache[key]
+        path = _render_power(csv_path, device, out_png)
+        _plot_cache[key] = path
+    return path
+
+
+def _render_power(csv_path, device, out_png):
     df = pd.read_csv(csv_path)
     if df.empty or "timestamp" not in df.columns or "power" not in df.columns:
         raise FileNotFoundError(f"No data for {device}")
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df["timestamp"] = _normalize_local(df["timestamp"])
     df["power"] = pd.to_numeric(df["power"], errors="coerce")
     df = df.dropna(subset=["timestamp", "power"])
     now = pd.Timestamp.now()
@@ -231,6 +282,12 @@ def plot_power(device=DEFAULT_DEVICE, out_png=None):
 
     ax.set_yscale("log")
     ax.set_ylim(bottom=1.0)
+    # Fix the x-axis to the "since midnight" window. matplotlib pads a
+    # zero-width datetime range by ~5% of the epoch-day value (~1600 days
+    # today), which makes the hourly minor locator try to generate tens of
+    # thousands of ticks. A bounded, non-empty range avoids that.
+    x0 = now.normalize()
+    ax.set_xlim(x0, max(now, x0 + pd.Timedelta(minutes=1)))
     ax.set_xlabel("time", color=TEXT_BODY)
     ax.set_ylabel("power (W, log)", color=TEXT_BODY)
 
@@ -273,8 +330,6 @@ def plot_power(device=DEFAULT_DEVICE, out_png=None):
     fig.text(0.5, 0.02, "y-axis log · shaded band = brew above threshold",
              ha="center", fontsize=8, color=TEXT_FOOT)
 
-    if out_png is None:
-        out_png = DATA_DIR / f"plot_{device}.png"
     fig.savefig(out_png, dpi=100)
     plt.close(fig)
     return out_png

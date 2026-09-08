@@ -2,6 +2,8 @@ import csv
 import json
 from types import SimpleNamespace
 
+import pandas as pd
+
 import mqtt_logger
 
 
@@ -74,3 +76,36 @@ def test_on_message_ignores_non_numeric_power(tmp_path, monkeypatch):
     mqtt_logger.on_message(None, None, msg)
 
     assert not mqtt_logger.csv_path("oikea").exists()
+
+
+def test_on_message_writes_tz_aware_timestamp(tmp_path, monkeypatch):
+    monkeypatch.setattr(mqtt_logger, "DATA_DIR", tmp_path)
+    topic = f"{mqtt_logger.MQTT_BASE_TOPIC}/oikea"
+    mqtt_logger.on_message(None, None, _msg(topic, json.dumps({"power": 7}).encode()))
+
+    with open(mqtt_logger.csv_path("oikea")) as f:
+        rows = list(csv.reader(f))
+    assert rows[1][1] == "7.0"
+    assert pd.to_datetime(rows[1][0]).tz is not None
+
+
+def test_prune_csv_noop_when_under_limit(tmp_path):
+    path = tmp_path / "power_oikea.csv"
+    mqtt_logger.ensure_csv(path)
+    mqtt_logger.prune_csv(path, keep=3)
+    with open(path) as f:
+        assert [r[0] for r in csv.reader(f)] == ["timestamp"]
+
+
+def test_on_message_prunes_large_csv(tmp_path, monkeypatch):
+    monkeypatch.setattr(mqtt_logger, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(mqtt_logger, "MAX_CSV_BYTES", 1)
+    monkeypatch.setattr(mqtt_logger, "PRUNE_KEEP_ROWS", 3)
+    topic = f"{mqtt_logger.MQTT_BASE_TOPIC}/oikea"
+    for i in range(5):
+        mqtt_logger.on_message(None, None, _msg(topic, json.dumps({"power": float(i)}).encode()))
+
+    with open(mqtt_logger.csv_path("oikea")) as f:
+        rows = list(csv.reader(f))
+    assert rows[0] == ["timestamp", "power"]
+    assert [r[1] for r in rows[1:]] == ["2.0", "3.0", "4.0"]
