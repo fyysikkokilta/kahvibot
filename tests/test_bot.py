@@ -1,10 +1,20 @@
 import asyncio
 import csv
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import bot
 import plot
+
+
+def write_csv(path, rows):
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["timestamp", "power"])
+        for ts, power in rows:
+            w.writerow([ts, power])
+    return path
 
 
 def make_context(args=None):
@@ -143,3 +153,40 @@ def test_handle_message_no_device_defaults_to_all(tmp_path, monkeypatch):
 
     messages = [c.args[1] for c in context.bot.send_message.call_args_list]
     assert len(messages) == 2
+
+
+# --- rate limiting & combined plot --------------------------------------------
+
+
+def test_throttle_blocks_repeat_same_action(monkeypatch):
+    monkeypatch.setattr(bot, "RATE_LIMIT_SECONDS", 10.0)
+    bot._RATE_LIMIT.clear()
+    assert bot._throttled(999, "plot") is False
+    assert bot._throttled(999, "plot") is True
+    assert bot._throttled(999, "brew") is False
+    bot._RATE_LIMIT.clear()
+
+
+def test_throttle_disabled_when_limit_zero(monkeypatch):
+    monkeypatch.setattr(bot, "RATE_LIMIT_SECONDS", 0.0)
+    bot._RATE_LIMIT.clear()
+    assert bot._throttled(999, "plot") is False
+    assert bot._throttled(999, "plot") is False
+    bot._RATE_LIMIT.clear()
+
+
+def test_cmd_plot_all_sends_combined_photo(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    now = datetime.now()
+    for device in bot.DEVICES:
+        write_csv(
+            plot.get_csv_path(device),
+            [((now - timedelta(minutes=1)).isoformat(), 123)],
+        )
+    update = make_update()
+    context = make_context(args=["all"])
+
+    run(bot.cmd_plot(update, context))
+
+    context.bot.send_photo.assert_awaited_once()
+    assert context.bot.send_photo.call_args.kwargs["caption"] == "Combined power usage since midnight"

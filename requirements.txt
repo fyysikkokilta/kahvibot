@@ -1,6 +1,6 @@
-python-telegram-bot
-paho-mqtt
-pandas
-matplotlib
-numpy
-pyparsing
+python-telegram-bot>=20
+paho-mqtt>=2
+pandas>=1.5
+matplotlib>=3.5
+numpy>=1.23
+pyparsing>=3.0

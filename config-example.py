@@ -19,6 +19,10 @@ TELEGRAM_TOKEN = _env("TELEGRAM_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 # Optional numeric chat id to receive bot error notifications. Empty = off.
 ADMIN_CHAT_ID = _env("ADMIN_CHAT_ID", "")
 
+# Minimum seconds between same-action (/plot, /brew) commands per chat.
+# 0 disables the throttle.
+RATE_LIMIT_SECONDS = float(_env("RATE_LIMIT_SECONDS", "3"))
+
 MQTT_BROKER = _env("MQTT_BROKER", "localhost")
 MQTT_PORT = int(_env("MQTT_PORT", "1883"))
 MQTT_USER = _env("MQTT_USER", "zigbee2mqtt")

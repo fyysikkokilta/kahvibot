@@ -331,3 +331,34 @@ def test_plot_power_cache_invalidates_on_file_change(tmp_path, monkeypatch):
     write_csv(plot.get_csv_path("oikea"), [(iso(base), 123), (iso(datetime.now()), 200)])
     plot.plot_power("oikea", out_png=out)
     assert calls["n"] == 2
+
+
+# --- plot_all -----------------------------------------------------------------
+
+
+def test_plot_all_overlays_devices(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    now = datetime.now()
+    write_csv(
+        plot.get_csv_path("vasen"),
+        [(iso(now - timedelta(minutes=2)), 10), (iso(now - timedelta(minutes=1)), 400)],
+    )
+    write_csv(plot.get_csv_path("oikea"), [(iso(now - timedelta(minutes=1)), 500)])
+
+    out = tmp_path / "all.png"
+    assert plot.plot_all(out_png=out) == out
+    assert out.is_file()
+
+
+def test_plot_all_skips_devices_without_data(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    write_csv(plot.get_csv_path("vasen"), [(iso(datetime.now()), 123)])
+
+    out = tmp_path / "all.png"
+    assert plot.plot_all(out_png=out) == out
+
+
+def test_plot_all_requires_some_data(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    with pytest.raises(FileNotFoundError):
+        plot.plot_all()

@@ -24,6 +24,8 @@ def _make_test_config():
     cfg.HEAT = 100.0
     cfg.PLOT_HOURS = 24.0
     cfg.CUP_CALIBRATION = []
+    cfg.ADMIN_CHAT_ID = None
+    cfg.RATE_LIMIT_SECONDS = 0.0
     return cfg
 
 

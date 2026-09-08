@@ -18,6 +18,7 @@ from config import (
     BREW_THRESHOLD,
     HEAT,
     CUP_CALIBRATION,
+    DEVICES,
 )
 
 _DEVICE_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -328,6 +329,114 @@ def _render_power(csv_path, device, out_png):
     fig.legend(handles=legend, loc="lower center", ncol=3, frameon=False,
                fontsize=9, bbox_to_anchor=(0.5, 0.055))
     fig.text(0.5, 0.02, "y-axis log · shaded band = brew above threshold",
+             ha="center", fontsize=8, color=TEXT_FOOT)
+
+    fig.savefig(out_png, dpi=100)
+    plt.close(fig)
+    return out_png
+
+
+def _today_df(device, now):
+    """Today's samples for a device, or None if none since midnight."""
+    path = get_csv_path(device)
+    if not path.is_file():
+        return None
+    df = pd.read_csv(path)
+    if df.empty or "power" not in df.columns:
+        return None
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df["timestamp"] = _normalize_local(df["timestamp"])
+    df["power"] = pd.to_numeric(df["power"], errors="coerce")
+    df = df.dropna(subset=["timestamp", "power"])
+    today = df[df["timestamp"] >= now.normalize()]
+    return today if not today.empty else None
+
+
+def plot_all(devices=None, out_png=None):
+    """Overlay today's data for several devices on one PNG (cached like
+    plot_power, keyed on all involved CSVs)."""
+    if devices is None:
+        devices = DEVICES
+    if out_png is None:
+        out_png = DATA_DIR / "plot_all.png"
+    stats = []
+    for device in devices:
+        path = get_csv_path(device)
+        if path.is_file():
+            st = path.stat()
+            stats.append((str(path), st.st_mtime_ns, st.st_size))
+        else:
+            stats.append((str(path), None))
+    key = (tuple(stats), str(out_png))
+    with _render_lock:
+        if key in _plot_cache:
+            return _plot_cache[key]
+        path = _render_all(devices, out_png)
+        _plot_cache[key] = path
+    return path
+
+
+def _render_all(devices, out_png):
+    now = pd.Timestamp.now()
+    series = [(d, df) for d in devices if (df := _today_df(d, now)) is not None]
+    if not series:
+        raise FileNotFoundError("No data for any device since midnight")
+
+    fig, ax = plt.subplots(figsize=(10, 6.4))
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    ax.axhline(BREW_THRESHOLD, color=TEXT_DIM, linewidth=1, linestyle=":", zorder=1)
+    for device, df in series:
+        y = df["power"].clip(lower=1.0)
+        color = DEVICE_COLORS.get(device, TEXT_BODY)
+        ax.plot(df["timestamp"], y, color=color, linewidth=1.4, zorder=2)
+        if len(df) < 400:
+            ax.plot(
+                df["timestamp"], y, color=color,
+                marker="o", markersize=2.6, linewidth=0, zorder=3,
+            )
+
+    ax.set_yscale("log")
+    ax.set_ylim(bottom=1.0)
+    x0 = now.normalize()
+    ax.set_xlim(x0, max(now, x0 + pd.Timedelta(minutes=1)))
+    ax.set_xlabel("time", color=TEXT_BODY)
+    ax.set_ylabel("power (W, log)", color=TEXT_BODY)
+
+    fig.text(
+        0.08, 0.955, "Power usage since midnight — all devices",
+        fontsize=15, fontweight="bold", color=TEXT_DARK, va="top",
+    )
+    fig.text(0.985, 0.955, now.strftime("%a %d.%m."), ha="right",
+             va="top", fontsize=10, color=TEXT_DIM)
+
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.xaxis.set_minor_locator(mdates.HourLocator())
+    ax.grid(True, which="major", color=GRID_MAJOR, linewidth=0.9)
+    ax.grid(True, which="minor", color=GRID_MINOR, linewidth=0.6)
+
+    for spine in ax.spines.values():
+        spine.set_color(FRAME)
+        spine.set_linewidth(1.2)
+
+    ax.tick_params(axis="both", colors=TEXT_BODY, labelsize=9)
+    ax.tick_params(axis="y", which="minor", length=0)
+    ax.tick_params(axis="x", which="minor", length=4, color=FRAME)
+
+    legend = [
+        Line2D([0], [0], color=DEVICE_COLORS.get(d, TEXT_BODY), linewidth=1.6, label=d)
+        for d, _ in series
+    ]
+    legend.append(
+        Line2D([0], [0], color=TEXT_DIM, linewidth=1, linestyle=":",
+               label=f"brew threshold {BREW_THRESHOLD:.0f} W")
+    )
+    fig.subplots_adjust(left=0.08, right=0.985, top=0.86, bottom=0.12)
+    fig.legend(handles=legend, loc="lower center", ncol=len(legend), frameon=False,
+               fontsize=9, bbox_to_anchor=(0.5, 0.055))
+    fig.text(0.5, 0.02, "y-axis log · each device in its own color",
              ha="center", fontsize=8, color=TEXT_FOOT)
 
     fig.savefig(out_png, dpi=100)

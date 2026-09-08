@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from telegram import Update
 from telegram.ext import (
@@ -13,7 +14,7 @@ from telegram.ext import (
 
 from config import TELEGRAM_TOKEN, DEVICES
 from aliases import ALIASES, COMBINED
-from plot import get_csv_path, plot_power, last_brew, brew_summary
+from plot import get_csv_path, plot_power, plot_all, last_brew, brew_summary
 
 logger = logging.getLogger("bot")
 
@@ -23,6 +24,12 @@ except ImportError:
     ADMIN_CHAT_ID = None
 ADMIN_CHAT_ID = int(ADMIN_CHAT_ID) if str(ADMIN_CHAT_ID or "").strip().isdigit() else None
 
+try:
+    from config import RATE_LIMIT_SECONDS
+except ImportError:
+    RATE_LIMIT_SECONDS = 3.0
+RATE_LIMIT_SECONDS = float(RATE_LIMIT_SECONDS or 0)
+
 COMMANDS = [
     ("plot", "Power plot for a device"),
     ("brew", "When was the last brew"),
@@ -31,13 +38,51 @@ COMMANDS = [
 
 _device_index = 0
 
+_RATE_LIMIT = {}
+
+
+def _throttled(chat_id, action):
+    """True if this chat already did `action` within RATE_LIMIT_SECONDS."""
+    if RATE_LIMIT_SECONDS <= 0:
+        return False
+    key = (chat_id, action)
+    now = time.monotonic()
+    last = _RATE_LIMIT.get(key)
+    if last is not None and now - last < RATE_LIMIT_SECONDS:
+        return True
+    _RATE_LIMIT[key] = now
+    return False
+
 
 def pick_devices(context):
     return [context.args[0].lower()] if context.args else DEVICES
 
 
 async def cmd_plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if _throttled(update.effective_chat.id, "plot"):
+        await context.bot.send_message(
+            update.effective_chat.id,
+            f"Please wait {RATE_LIMIT_SECONDS:g}s between plot requests.",
+        )
+        return
     for device in pick_devices(context):
+        if device == "all":
+            await context.bot.send_message(
+                update.effective_chat.id, "Generating combined plot..."
+            )
+            try:
+                png_path = await asyncio.to_thread(plot_all)
+            except FileNotFoundError:
+                await context.bot.send_message(
+                    update.effective_chat.id, "No recent data for any device."
+                )
+                continue
+            caption = "Combined power usage since midnight"
+            with open(png_path, "rb") as f:
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id, photo=f, caption=caption
+                )
+            continue
         if device not in DEVICES:
             await context.bot.send_message(
                 update.effective_chat.id,
@@ -64,6 +109,11 @@ def _brew_caption(device):
 
 
 async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if _throttled(update.effective_chat.id, "brew"):
+        await context.bot.send_message(
+            update.effective_chat.id, "Please wait a moment before asking again."
+        )
+        return
     for device in pick_devices(context):
         if device not in DEVICES:
             await context.bot.send_message(
@@ -154,6 +204,7 @@ def main():
     app.add_handler(CommandHandler(["plot"], cmd_plot))
     app.add_handler(CommandHandler(["brew"], cmd_brew))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("plot_all", cmd_plot_inline))
     for device in DEVICES:
         app.add_handler(CommandHandler(f"plot_{device}", cmd_plot_inline))
         app.add_handler(CommandHandler(f"brew_{device}", cmd_brew_inline))
