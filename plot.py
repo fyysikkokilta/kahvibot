@@ -1,3 +1,4 @@
+import json
 import re
 
 import matplotlib
@@ -31,6 +32,42 @@ TEXT_DIM = "#5a5a5a"
 TEXT_FOOT = "#6a6a6a"
 BREW = "#2ca02c"
 DEVICE_COLORS = {"vasen": "#1f77b4", "oikea": "#e07b00"}
+
+CALIBRATION_FILE = "calibration.json"
+
+
+# --- brew-size calibration store ---------------------------------------------
+# Points are (duration_seconds, cups) pairs. They come from the CUP_CALIBRATION
+# config value if set, otherwise from data/calibration.json (written by
+# calibrate.py). A linear fit through the points is used by estimate_cups.
+
+def _calibration_path():
+    return DATA_DIR / CALIBRATION_FILE
+
+
+def load_calibration():
+    points = list(CUP_CALIBRATION)
+    if points:
+        return [tuple(p) for p in points]
+    path = _calibration_path()
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text())
+            points = [(float(s), float(c)) for s, c in data.get("points", [])]
+        except (ValueError, TypeError, OSError):
+            points = []
+    return sorted(points)
+
+
+def save_calibration(points):
+    path = _calibration_path()
+    path.parent.mkdir(exist_ok=True)
+    data = {
+        "points": [[float(s), float(c)] for s, c in points],
+        "updated": pd.Timestamp.now().isoformat(),
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    return path
 
 
 def get_csv_path(device=DEFAULT_DEVICE):
@@ -115,10 +152,10 @@ def estimate_cups(duration):
     still passing through, so brew duration scales with the amount of water.
     Returns None if no calibration points are configured.
     """
-    if not CUP_CALIBRATION:
+    if not load_calibration():
         return None
     seconds = duration.total_seconds() if hasattr(duration, "total_seconds") else duration
-    points = sorted(CUP_CALIBRATION)
+    points = sorted(load_calibration())
     if len(points) == 1:
         ref_secs, ref_cups = points[0]
         if ref_secs <= 0:

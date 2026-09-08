@@ -79,6 +79,33 @@ def test_estimate_cups_never_returns_negative(monkeypatch):
     assert plot.estimate_cups(timedelta(seconds=0)) == pytest.approx(0.0)
 
 
+def test_save_and_load_calibration_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(plot, "CUP_CALIBRATION", [])
+    plot.save_calibration([(300.0, 4.0), (400.0, 6.0)])
+    assert plot.load_calibration() == [(300.0, 4.0), (400.0, 6.0)]
+
+
+def test_load_calibration_prefers_config_over_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(plot, "CUP_CALIBRATION", [(100.0, 2.0)])
+    plot.save_calibration([(999.0, 99.0)])
+    assert plot.load_calibration() == [(100.0, 2.0)]
+
+
+def test_estimate_cups_uses_file_calibration(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(plot, "CUP_CALIBRATION", [])
+    plot.save_calibration([(400.0, 8.0)])
+    assert plot.estimate_cups(timedelta(seconds=200)) == pytest.approx(4.0)
+
+
+def test_load_calibration_empty_when_no_store(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(plot, "CUP_CALIBRATION", [])
+    assert plot.load_calibration() == []
+
+
 def test_brew_summary_no_brew():
     text = plot.brew_summary(None)
     assert "No brews detected" in text

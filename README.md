@@ -75,6 +75,24 @@ amount of water brewed. Once you've measured a couple of reference brews
 Leave unset until you have measurements — no cup estimate is shown without
 calibration.
 
+### Teaching brew sizes (recommended)
+
+Instead of editing `CUP_CALIBRATION` by hand, teach real brews with
+`calibrate.py`, which stores points in `data/calibration.json` (and beats the
+env var at runtime):
+
+```bash
+python3 calibrate.py list                    # recent brews per device
+python3 calibrate.py add oikea 8             # that pot made 8 cups
+python3 calibrate.py add vasen 6 --at 06:47  # a specific brew by end time
+python3 calibrate.py show                    # points + fitted mapping
+python3 calibrate.py remove 0                # drop a bad point
+```
+
+Each `add` records the detected brew's duration (seconds) against the cup
+count you tell it. With two or more points the fit captures both scale and any
+fixed warm-up offset; one point scales linearly from zero.
+
 ## Bot commands
 
 - `/plot [device]` — power plot for a device
