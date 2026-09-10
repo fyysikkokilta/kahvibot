@@ -1,0 +1,16 @@
+# Secrets - never commit
+config.py
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Runtime data / generated artifacts
+data/
+
+# Separate git repo (fyysikkokilta/kahvibot clone)
+fk/kahvibot/
