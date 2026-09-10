@@ -1,0 +1,364 @@
+{
+ "micro": {
+  "cold_subprocess_tta8_s": 2.0147550001274794,
+  "warm_detect_s": 0.03535709995776415,
+  "warm_read_tta1_s": 0.09907639992889017,
+  "warm_read_tta8_s": 0.5833278499776497,
+  "warm_detect_plus_tta8_s": 0.6186849499354139,
+  "warm_detect_plus_tta1_s": 0.13443349988665432
+ },
+ "costs": {
+  "capture_s": 2.0,
+  "capture_cpu_s": 1.0,
+  "cold_start_s": 3.0,
+  "pi_tta8_read_s": 8.0,
+  "legacy_tick_wall_s": 23.0,
+  "legacy_probe_wall_s": 96.0,
+  "legacy_dark_tick_wall_s": 8.0,
+  "legacy_quota": 0.25,
+  "bot_upload_s": 3.0,
+  "scale": 12.930652347103546
+ },
+ "equivalence": {
+  "frames": 20,
+  "mismatches": 0
+ },
+ "scenarios": [
+  {
+   "title": "typical day (2026-09-01 pattern, 17 photos) on 2026-01-30",
+   "requests": 17,
+   "legacy": {
+    "requests": 17,
+    "photo_latency_p50": 16.02972173690796,
+    "photo_latency_p90": 18.87236785888672,
+    "photo_latency_max": 24.535640716552734,
+    "reading_latency_p50": 16.02972173690796,
+    "reading_latency_p90": 18.87236785888672,
+    "requests_reused": 0,
+    "requests_captured": 17,
+    "captures": 1315,
+    "bot_captures": 17,
+    "sampler_lit_ticks": 1045,
+    "sampler_skipped": 2,
+    "sampler_gap_median": 33.0,
+    "sampler_gap_p90": 83.0,
+    "blind_hours": 1.99,
+    "cpu_bot_s": 216,
+    "cpu_sampler_s": 7482,
+    "cpu_total_s": 7698,
+    "records": 1315
+   },
+   "new": {
+    "requests": 17,
+    "photo_latency_p50": 3.0,
+    "photo_latency_p90": 6.3496832847595215,
+    "photo_latency_max": 6.421602010726929,
+    "reading_latency_p50": 0.0,
+    "reading_latency_p90": 3.4216020107269287,
+    "requests_reused": 16,
+    "requests_captured": 1,
+    "captures": 4497,
+    "sampler_lit_ticks": 4242,
+    "sampler_gap_median": 10.0,
+    "sampler_gap_p90": 10.528889541274111,
+    "blind_hours": null,
+    "cpu_total_s": 10346,
+    "records": 4496,
+    "graph_calls": 2,
+    "graph_renders": 2,
+    "graph_hits": 0,
+    "graph_renders_legacy_key": 2,
+    "graph_render_local_s": 0.242
+   },
+   "tta_agreement_ml": {
+    "n": 34,
+    "ml_median": 2.3,
+    "ml_p90": 14.8,
+    "h_median": 0.0038
+   },
+   "coverage": {
+    "legacy_pots": 2090,
+    "legacy_usable_0.55": 952,
+    "new_pots": 8484,
+    "new_usable": 8378
+   },
+   "memo": {
+    "legacy_misses": 584,
+    "new_misses": 482
+   }
+  },
+  {
+   "title": "burst day (2026-09-03 pattern, 98 photos) on 2026-01-31",
+   "requests": 97,
+   "legacy": {
+    "requests": 97,
+    "photo_latency_p50": 13.636911153793335,
+    "photo_latency_p90": 16.836785316467285,
+    "photo_latency_max": 19.499488830566406,
+    "reading_latency_p50": 13.636911153793335,
+    "reading_latency_p90": 16.836785316467285,
+    "requests_reused": 0,
+    "requests_captured": 97,
+    "captures": 1432,
+    "bot_captures": 97,
+    "sampler_lit_ticks": 1046,
+    "sampler_skipped": 7,
+    "sampler_gap_median": 33.0,
+    "sampler_gap_p90": 43.0,
+    "blind_hours": 0.76,
+    "cpu_bot_s": 797,
+    "cpu_sampler_s": 7614,
+    "cpu_total_s": 8411,
+    "records": 1432
+   },
+   "new": {
+    "requests": 97,
+    "photo_latency_p50": 3.0,
+    "photo_latency_p90": 5.150440454483032,
+    "photo_latency_max": 6.20390248298645,
+    "reading_latency_p50": 0.0,
+    "reading_latency_p90": 2.59017566114926,
+    "requests_reused": 94,
+    "requests_captured": 3,
+    "captures": 4310,
+    "sampler_lit_ticks": 4016,
+    "sampler_gap_median": 10.0,
+    "sampler_gap_p90": 10.539387941083987,
+    "blind_hours": null,
+    "cpu_total_s": 7803,
+    "records": 4307,
+    "graph_calls": 16,
+    "graph_renders": 4,
+    "graph_hits": 12,
+    "graph_renders_legacy_key": 16,
+    "graph_render_local_s": 0.388
+   },
+   "tta_agreement_ml": {
+    "n": 97,
+    "ml_median": 0.0,
+    "ml_p90": 46.9,
+    "h_median": 0.0093
+   },
+   "coverage": {
+    "legacy_pots": 1277,
+    "legacy_usable_0.55": 747,
+    "new_pots": 4975,
+    "new_usable": 4220
+   },
+   "memo": {
+    "legacy_misses": 576,
+    "new_misses": 418
+   }
+  },
+  {
+   "title": "stress (synthetic): 1 req/min 09-17, 40 requests 5 s apart at 10:00, 20 requests 3 s apart at 11:30, on 2026-02-01",
+   "requests": 542,
+   "legacy": {
+    "requests": 542,
+    "photo_latency_p50": 15.798687219619751,
+    "photo_latency_p90": 149.38262677192688,
+    "photo_latency_max": 499.8492765426636,
+    "reading_latency_p50": 15.798687219619751,
+    "reading_latency_p90": 149.38262677192688,
+    "requests_reused": 0,
+    "requests_captured": 542,
+    "captures": 1707,
+    "bot_captures": 542,
+    "sampler_lit_ticks": 800,
+    "sampler_skipped": 74,
+    "sampler_gap_median": 33.0,
+    "sampler_gap_p90": 83.0,
+    "blind_hours": 6.78,
+    "cpu_bot_s": 6306,
+    "cpu_sampler_s": 6115,
+    "cpu_total_s": 12420,
+    "records": 1707
+   },
+   "new": {
+    "requests": 542,
+    "photo_latency_p50": 3.0307018756866455,
+    "photo_latency_p90": 6.1885271072387695,
+    "photo_latency_max": 25.710280179977417,
+    "reading_latency_p50": 0.030701875686645508,
+    "reading_latency_p90": 3.6109495162963867,
+    "requests_reused": 520,
+    "requests_captured": 22,
+    "captures": 3873,
+    "sampler_lit_ticks": 3469,
+    "sampler_gap_median": 10.0,
+    "sampler_gap_p90": 10.506012631565682,
+    "blind_hours": null,
+    "cpu_total_s": 8779,
+    "records": 3854,
+    "graph_calls": 90,
+    "graph_renders": 36,
+    "graph_hits": 54,
+    "graph_renders_legacy_key": 90,
+    "graph_render_local_s": 5.846
+   },
+   "tta_agreement_ml": {
+    "n": 1084,
+    "ml_median": 2.1,
+    "ml_p90": 17.5,
+    "h_median": 0.0029
+   },
+   "coverage": {
+    "legacy_pots": 1558,
+    "legacy_usable_0.55": 391,
+    "new_pots": 6740,
+    "new_usable": 6529
+   },
+   "memo": {
+    "legacy_misses": 790,
+    "new_misses": 289
+   }
+  }
+ ],
+ "interval_sweep": [
+  {
+   "requests": 17,
+   "photo_latency_p50": 3.0,
+   "photo_latency_p90": 6.3496832847595215,
+   "photo_latency_max": 6.421602010726929,
+   "reading_latency_p50": 0.0,
+   "reading_latency_p90": 3.4216020107269287,
+   "requests_reused": 16,
+   "requests_captured": 1,
+   "captures": 4497,
+   "sampler_lit_ticks": 4242,
+   "sampler_gap_median": 10.0,
+   "sampler_gap_p90": 10.528889541274111,
+   "blind_hours": null,
+   "cpu_total_s": 10346,
+   "records": 4496,
+   "graph_calls": 2,
+   "graph_renders": 2,
+   "graph_hits": 0,
+   "graph_renders_legacy_key": 2,
+   "graph_render_local_s": 0.273,
+   "interval": 10.0,
+   "reuse_max_age": 15.0
+  },
+  {
+   "requests": 17,
+   "photo_latency_p50": 3.0,
+   "photo_latency_p90": 5.300570726394653,
+   "photo_latency_max": 7.062488079071045,
+   "reading_latency_p50": 0.0,
+   "reading_latency_p90": 3.259529184164421,
+   "requests_reused": 16,
+   "requests_captured": 1,
+   "captures": 3083,
+   "sampler_lit_ticks": 2828,
+   "sampler_gap_median": 15.0,
+   "sampler_gap_p90": 15.534051460868795,
+   "blind_hours": null,
+   "cpu_total_s": 7021,
+   "records": 3082,
+   "graph_calls": 2,
+   "graph_renders": 2,
+   "graph_hits": 0,
+   "graph_renders_legacy_key": 2,
+   "graph_render_local_s": 0.175,
+   "interval": 15.0,
+   "reuse_max_age": 22.5
+  },
+  {
+   "requests": 17,
+   "photo_latency_p50": 3.0,
+   "photo_latency_p90": 5.000005722045898,
+   "photo_latency_max": 6.349680185317993,
+   "reading_latency_p50": 0.0,
+   "reading_latency_p90": 3.2595301378387376,
+   "requests_reused": 16,
+   "requests_captured": 1,
+   "captures": 2376,
+   "sampler_lit_ticks": 2121,
+   "sampler_gap_median": 20.0,
+   "sampler_gap_p90": 20.53616949978459,
+   "blind_hours": null,
+   "cpu_total_s": 5276,
+   "records": 2375,
+   "graph_calls": 2,
+   "graph_renders": 2,
+   "graph_hits": 0,
+   "graph_renders_legacy_key": 2,
+   "graph_render_local_s": 0.138,
+   "interval": 20.0,
+   "reuse_max_age": 30.0
+  },
+  {
+   "requests": 17,
+   "photo_latency_p50": 3.0,
+   "photo_latency_p90": 5.221538543701172,
+   "photo_latency_max": 6.210305213928223,
+   "reading_latency_p50": 0.0,
+   "reading_latency_p90": 3.1789882312441478,
+   "requests_reused": 16,
+   "requests_captured": 1,
+   "captures": 1669,
+   "sampler_lit_ticks": 1414,
+   "sampler_gap_median": 30.0,
+   "sampler_gap_p90": 30.53199031123222,
+   "blind_hours": null,
+   "cpu_total_s": 3560,
+   "records": 1668,
+   "graph_calls": 2,
+   "graph_renders": 2,
+   "graph_hits": 0,
+   "graph_renders_legacy_key": 2,
+   "graph_render_local_s": 0.125,
+   "interval": 30.0,
+   "reuse_max_age": 45.0
+  }
+ ],
+ "sweep": {
+  "pots": 591,
+  "rows": [
+   {
+    "gate": 0.55,
+    "coverage": 0.39086294416243655,
+    "n": 231,
+    "nonempty_ge_125ml": 28
+   },
+   {
+    "gate": 0.58,
+    "coverage": 0.6818950930626058,
+    "n": 403,
+    "nonempty_ge_125ml": 45
+   },
+   {
+    "gate": 0.6,
+    "coverage": 0.8358714043993232,
+    "n": 494,
+    "nonempty_ge_125ml": 84
+   },
+   {
+    "gate": 0.62,
+    "coverage": 0.8798646362098139,
+    "n": 520,
+    "nonempty_ge_125ml": 100
+   },
+   {
+    "gate": 0.65,
+    "coverage": 0.9153976311336718,
+    "n": 541,
+    "nonempty_ge_125ml": 117
+   },
+   {
+    "gate": 0.7,
+    "coverage": 0.9390862944162437,
+    "n": 555,
+    "nonempty_ge_125ml": 127
+   }
+  ]
+ },
+ "meta": {
+  "when": "2026-09-09T22:45",
+  "machine": "i7-12700H, 20 threads, onnxruntime CPU, 2 intra-op threads",
+  "frames": 10099,
+  "archive_span": "2026-01-12 .. 2026-06-13",
+  "micro_frames": 20,
+  "elapsed_s": 687
+ }
+}

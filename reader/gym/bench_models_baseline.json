@@ -1,0 +1,613 @@
+{
+ "results": [
+  {
+   "tag": "v8",
+   "ckpt": "_work/model_v8/best.pt",
+   "calibration": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\calibration_v8.json",
+   "onnx": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\onnx_v8",
+   "blind": {
+    "n": 99,
+    "fill_median_ml": 30.88,
+    "fill_p90_ml": 96.08,
+    "within_25ml": 0.455,
+    "nonempty_median_ml": 28.82,
+    "nonempty_n": 74,
+    "surf_median_ml": 33.32,
+    "bias_ml": 0.0,
+    "pearson_h": 0.9805
+   },
+   "field": {
+    "pots": 400,
+    "tta": 1,
+    "entropy_median": 0.5684,
+    "coverage": {
+     "0.55": {
+      "frac": 0.292,
+      "nonempty_ge_125ml": 21
+     },
+     "0.58": {
+      "frac": 0.603,
+      "nonempty_ge_125ml": 43
+     },
+     "0.6": {
+      "frac": 0.752,
+      "nonempty_ge_125ml": 69
+     },
+     "0.62": {
+      "frac": 0.843,
+      "nonempty_ge_125ml": 93
+     },
+     "0.65": {
+      "frac": 0.902,
+      "nonempty_ge_125ml": 113
+     },
+     "0.7": {
+      "frac": 0.943,
+      "nonempty_ge_125ml": 125
+     }
+    },
+    "labelled": {
+     "n": 31,
+     "n_blind": 13,
+     "abs_err_ml_median": 44.5,
+     "abs_err_ml_p90": 97.3,
+     "human_h_median": 0.229,
+     "nonempty_n": 16,
+     "nonempty_err_median": 49.8,
+     "by_gate": {
+      "0.55": {
+       "kept": 8,
+       "kept_err_median": 51.4,
+       "rejected": 23,
+       "rejected_err_median": 29.2,
+       "kept_nonempty": 2,
+       "kept_nonempty_err": 221.9,
+       "rejected_nonempty": 14,
+       "rejected_nonempty_err": 45.7
+      },
+      "0.58": {
+       "kept": 16,
+       "kept_err_median": 46.8,
+       "rejected": 15,
+       "rejected_err_median": 24.7,
+       "kept_nonempty": 6,
+       "kept_nonempty_err": 52.6,
+       "rejected_nonempty": 10,
+       "rejected_nonempty_err": 38.5
+      },
+      "0.6": {
+       "kept": 21,
+       "kept_err_median": 44.5,
+       "rejected": 10,
+       "rejected_err_median": 38.9,
+       "kept_nonempty": 7,
+       "kept_nonempty_err": 46.5,
+       "rejected_nonempty": 9,
+       "rejected_nonempty_err": 53.1
+      },
+      "0.62": {
+       "kept": 25,
+       "kept_err_median": 44.8,
+       "rejected": 6,
+       "rejected_err_median": 23.7,
+       "kept_nonempty": 10,
+       "kept_nonempty_err": 55.9,
+       "rejected_nonempty": 6,
+       "rejected_nonempty_err": 23.7
+      },
+      "0.65": {
+       "kept": 27,
+       "kept_err_median": 44.8,
+       "rejected": 4,
+       "rejected_err_median": 23.7,
+       "kept_nonempty": 12,
+       "kept_nonempty_err": 55.9,
+       "rejected_nonempty": 4,
+       "rejected_nonempty_err": 23.7
+      },
+      "0.7": {
+       "kept": 29,
+       "kept_err_median": 44.5,
+       "rejected": 2,
+       "rejected_err_median": 49.4,
+       "kept_nonempty": 14,
+       "kept_nonempty_err": 49.8,
+       "rejected_nonempty": 2,
+       "rejected_nonempty_err": 49.4
+      }
+     }
+    }
+   },
+   "archive": {
+    "pots": 293,
+    "entropy_median": 0.5526,
+    "0.55": {
+     "frac": 0.468,
+     "nonempty_ge_125ml": 0
+    },
+    "0.58": {
+     "frac": 0.785,
+     "nonempty_ge_125ml": 2
+    },
+    "0.6": {
+     "frac": 0.945,
+     "nonempty_ge_125ml": 2
+    },
+    "0.62": {
+     "frac": 0.959,
+     "nonempty_ge_125ml": 2
+    },
+    "0.65": {
+     "frac": 0.973,
+     "nonempty_ge_125ml": 2
+    },
+    "0.7": {
+     "frac": 0.986,
+     "nonempty_ge_125ml": 2
+    }
+   },
+   "note": "deployed model; resnet18 trunk, 3000 steps, hand-share 0.25, surf-weight 1.0",
+   "seconds": 68
+  },
+  {
+   "tag": "v18",
+   "ckpt": "_work/model_v18/last.pt",
+   "calibration": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\calibration_v18.json",
+   "onnx": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\onnx_v18",
+   "blind": {
+    "n": 99,
+    "fill_median_ml": 25.5,
+    "fill_p90_ml": 84.31,
+    "within_25ml": 0.495,
+    "nonempty_median_ml": 34.81,
+    "nonempty_n": 74,
+    "surf_median_ml": 29.87,
+    "bias_ml": -0.06,
+    "pearson_h": 0.98
+   },
+   "field": {
+    "pots": 400,
+    "tta": 1,
+    "entropy_median": 0.5714,
+    "coverage": {
+     "0.55": {
+      "frac": 0.28,
+      "nonempty_ge_125ml": 5
+     },
+     "0.58": {
+      "frac": 0.583,
+      "nonempty_ge_125ml": 31
+     },
+     "0.6": {
+      "frac": 0.73,
+      "nonempty_ge_125ml": 64
+     },
+     "0.62": {
+      "frac": 0.795,
+      "nonempty_ge_125ml": 81
+     },
+     "0.65": {
+      "frac": 0.845,
+      "nonempty_ge_125ml": 99
+     },
+     "0.7": {
+      "frac": 0.9,
+      "nonempty_ge_125ml": 120
+     }
+    },
+    "labelled": {
+     "n": 31,
+     "n_blind": 13,
+     "abs_err_ml_median": 53.0,
+     "abs_err_ml_p90": 122.6,
+     "human_h_median": 0.229,
+     "nonempty_n": 16,
+     "nonempty_err_median": 86.1,
+     "by_gate": {
+      "0.55": {
+       "kept": 8,
+       "kept_err_median": 51.9,
+       "rejected": 23,
+       "rejected_err_median": 53.7,
+       "kept_nonempty": 1,
+       "kept_nonempty_err": 237.0,
+       "rejected_nonempty": 15,
+       "rejected_nonempty_err": 84.4
+      },
+      "0.58": {
+       "kept": 14,
+       "kept_err_median": 52.3,
+       "rejected": 17,
+       "rejected_err_median": 55.1,
+       "kept_nonempty": 2,
+       "kept_nonempty_err": 121.3,
+       "rejected_nonempty": 14,
+       "rejected_nonempty_err": 86.1
+      },
+      "0.6": {
+       "kept": 21,
+       "kept_err_median": 50.8,
+       "rejected": 10,
+       "rejected_err_median": 86.1,
+       "kept_nonempty": 7,
+       "kept_nonempty_err": 22.2,
+       "rejected_nonempty": 9,
+       "rejected_nonempty_err": 87.7
+      },
+      "0.62": {
+       "kept": 23,
+       "kept_err_median": 50.8,
+       "rejected": 8,
+       "rejected_err_median": 87.8,
+       "kept_nonempty": 8,
+       "kept_nonempty_err": 53.3,
+       "rejected_nonempty": 8,
+       "rejected_nonempty_err": 87.8
+      },
+      "0.65": {
+       "kept": 24,
+       "kept_err_median": 51.2,
+       "rejected": 7,
+       "rejected_err_median": 87.7,
+       "kept_nonempty": 9,
+       "kept_nonempty_err": 84.4,
+       "rejected_nonempty": 7,
+       "rejected_nonempty_err": 87.7
+      },
+      "0.7": {
+       "kept": 26,
+       "kept_err_median": 52.3,
+       "rejected": 5,
+       "rejected_err_median": 87.7,
+       "kept_nonempty": 11,
+       "kept_nonempty_err": 84.4,
+       "rejected_nonempty": 5,
+       "rejected_nonempty_err": 87.7
+      }
+     }
+    }
+   },
+   "archive": {
+    "pots": 293,
+    "entropy_median": 0.5315,
+    "0.55": {
+     "frac": 0.754,
+     "nonempty_ge_125ml": 4
+    },
+    "0.58": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 8
+    },
+    "0.6": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 8
+    },
+    "0.62": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 8
+    },
+    "0.65": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 8
+    },
+    "0.7": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 8
+    }
+   },
+   "note": "v8 recipe, seed 1",
+   "seconds": 58
+  },
+  {
+   "tag": "v20last",
+   "ckpt": "_work/model_v20/last.pt",
+   "calibration": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\calibration_v20.json",
+   "onnx": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\onnx_v20last",
+   "blind": {
+    "n": 99,
+    "fill_median_ml": 24.64,
+    "fill_p90_ml": 94.15,
+    "within_25ml": 0.515,
+    "nonempty_median_ml": 41.97,
+    "nonempty_n": 74,
+    "surf_median_ml": 37.77,
+    "bias_ml": -12.89,
+    "pearson_h": 0.9836
+   },
+   "field": {
+    "pots": 400,
+    "tta": 1,
+    "entropy_median": 0.5924,
+    "coverage": {
+     "0.55": {
+      "frac": 0.15,
+      "nonempty_ge_125ml": 3
+     },
+     "0.58": {
+      "frac": 0.34,
+      "nonempty_ge_125ml": 6
+     },
+     "0.6": {
+      "frac": 0.605,
+      "nonempty_ge_125ml": 22
+     },
+     "0.62": {
+      "frac": 0.765,
+      "nonempty_ge_125ml": 39
+     },
+     "0.65": {
+      "frac": 0.882,
+      "nonempty_ge_125ml": 68
+     },
+     "0.7": {
+      "frac": 0.927,
+      "nonempty_ge_125ml": 83
+     }
+    },
+    "labelled": {
+     "n": 31,
+     "n_blind": 13,
+     "abs_err_ml_median": 22.3,
+     "abs_err_ml_p90": 135.1,
+     "human_h_median": 0.229,
+     "nonempty_n": 16,
+     "nonempty_err_median": 48.0,
+     "by_gate": {
+      "0.55": {
+       "kept": 4,
+       "kept_err_median": 33.4,
+       "rejected": 27,
+       "rejected_err_median": 22.3,
+       "kept_nonempty": 1,
+       "kept_nonempty_err": 286.3,
+       "rejected_nonempty": 15,
+       "rejected_nonempty_err": 47.5
+      },
+      "0.58": {
+       "kept": 9,
+       "kept_err_median": 0.0,
+       "rejected": 22,
+       "rejected_err_median": 36.9,
+       "kept_nonempty": 1,
+       "kept_nonempty_err": 286.3,
+       "rejected_nonempty": 15,
+       "rejected_nonempty_err": 47.5
+      },
+      "0.6": {
+       "kept": 15,
+       "kept_err_median": 7.7,
+       "rejected": 16,
+       "rejected_err_median": 45.2,
+       "kept_nonempty": 2,
+       "kept_nonempty_err": 154.3,
+       "rejected_nonempty": 14,
+       "rejected_nonempty_err": 48.0
+      },
+      "0.62": {
+       "kept": 19,
+       "kept_err_median": 7.7,
+       "rejected": 12,
+       "rejected_err_median": 48.0,
+       "kept_nonempty": 5,
+       "kept_nonempty_err": 42.9,
+       "rejected_nonempty": 11,
+       "rejected_nonempty_err": 48.5
+      },
+      "0.65": {
+       "kept": 23,
+       "kept_err_median": 14.4,
+       "rejected": 8,
+       "rejected_err_median": 75.7,
+       "kept_nonempty": 9,
+       "kept_nonempty_err": 31.0,
+       "rejected_nonempty": 7,
+       "rejected_nonempty_err": 102.9
+      },
+      "0.7": {
+       "kept": 28,
+       "kept_err_median": 17.5,
+       "rejected": 3,
+       "rejected_err_median": 102.9,
+       "kept_nonempty": 13,
+       "kept_nonempty_err": 42.9,
+       "rejected_nonempty": 3,
+       "rejected_nonempty_err": 102.9
+      }
+     }
+    }
+   },
+   "archive": {
+    "pots": 293,
+    "entropy_median": 0.572,
+    "0.55": {
+     "frac": 0.15,
+     "nonempty_ge_125ml": 0
+    },
+    "0.58": {
+     "frac": 0.642,
+     "nonempty_ge_125ml": 0
+    },
+    "0.6": {
+     "frac": 0.727,
+     "nonempty_ge_125ml": 0
+    },
+    "0.62": {
+     "frac": 0.788,
+     "nonempty_ge_125ml": 0
+    },
+    "0.65": {
+     "frac": 0.891,
+     "nonempty_ge_125ml": 0
+    },
+    "0.7": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    }
+   },
+   "note": "v8 recipe + w_unlab_invar 0.5, last checkpoint",
+   "seconds": 59
+  },
+  {
+   "tag": "v43last",
+   "ckpt": "_work/model_v43/last.pt",
+   "calibration": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\calibration_v43.json",
+   "onnx": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\onnx_v43last",
+   "blind": {
+    "n": 99,
+    "fill_median_ml": 27.24,
+    "fill_p90_ml": 93.76,
+    "within_25ml": 0.475,
+    "nonempty_median_ml": 31.75,
+    "nonempty_n": 74,
+    "surf_median_ml": 32.93,
+    "bias_ml": 7.51,
+    "pearson_h": 0.9868
+   },
+   "field": {
+    "pots": 400,
+    "tta": 1,
+    "entropy_median": 0.5786,
+    "coverage": {
+     "0.55": {
+      "frac": 0.203,
+      "nonempty_ge_125ml": 14
+     },
+     "0.58": {
+      "frac": 0.515,
+      "nonempty_ge_125ml": 36
+     },
+     "0.6": {
+      "frac": 0.703,
+      "nonempty_ge_125ml": 51
+     },
+     "0.62": {
+      "frac": 0.787,
+      "nonempty_ge_125ml": 71
+     },
+     "0.65": {
+      "frac": 0.855,
+      "nonempty_ge_125ml": 94
+     },
+     "0.7": {
+      "frac": 0.93,
+      "nonempty_ge_125ml": 121
+     }
+    },
+    "labelled": {
+     "n": 31,
+     "n_blind": 13,
+     "abs_err_ml_median": 49.2,
+     "abs_err_ml_p90": 95.5,
+     "human_h_median": 0.229,
+     "nonempty_n": 16,
+     "nonempty_err_median": 45.3,
+     "by_gate": {
+      "0.55": {
+       "kept": 9,
+       "kept_err_median": 50.6,
+       "rejected": 22,
+       "rejected_err_median": 47.0,
+       "kept_nonempty": 1,
+       "kept_nonempty_err": 242.3,
+       "rejected_nonempty": 15,
+       "rejected_nonempty_err": 39.8
+      },
+      "0.58": {
+       "kept": 12,
+       "kept_err_median": 49.9,
+       "rejected": 19,
+       "rejected_err_median": 39.8,
+       "kept_nonempty": 1,
+       "kept_nonempty_err": 242.3,
+       "rejected_nonempty": 15,
+       "rejected_nonempty_err": 39.8
+      },
+      "0.6": {
+       "kept": 15,
+       "kept_err_median": 49.2,
+       "rejected": 16,
+       "rejected_err_median": 45.3,
+       "kept_nonempty": 2,
+       "kept_nonempty_err": 124.0,
+       "rejected_nonempty": 14,
+       "rejected_nonempty_err": 45.3
+      },
+      "0.62": {
+       "kept": 21,
+       "kept_err_median": 49.2,
+       "rejected": 10,
+       "rejected_err_median": 45.3,
+       "kept_nonempty": 6,
+       "kept_nonempty_err": 63.7,
+       "rejected_nonempty": 10,
+       "rejected_nonempty_err": 45.3
+      },
+      "0.65": {
+       "kept": 27,
+       "kept_err_median": 50.6,
+       "rejected": 4,
+       "rejected_err_median": 32.6,
+       "kept_nonempty": 12,
+       "kept_nonempty_err": 73.6,
+       "rejected_nonempty": 4,
+       "rejected_nonempty_err": 32.6
+      },
+      "0.7": {
+       "kept": 30,
+       "kept_err_median": 49.9,
+       "rejected": 1,
+       "rejected_err_median": 19.3,
+       "kept_nonempty": 15,
+       "kept_nonempty_err": 50.7,
+       "rejected_nonempty": 1,
+       "rejected_nonempty_err": 19.3
+      }
+     }
+    }
+   },
+   "archive": {
+    "pots": 293,
+    "entropy_median": 0.5491,
+    "0.55": {
+     "frac": 0.509,
+     "nonempty_ge_125ml": 0
+    },
+    "0.58": {
+     "frac": 0.782,
+     "nonempty_ge_125ml": 4
+    },
+    "0.6": {
+     "frac": 0.829,
+     "nonempty_ge_125ml": 4
+    },
+    "0.62": {
+     "frac": 0.857,
+     "nonempty_ge_125ml": 4
+    },
+    "0.65": {
+     "frac": 0.918,
+     "nonempty_ge_125ml": 16
+    },
+    "0.7": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 30
+    }
+   },
+   "note": "v8 recipe with pair-frac 0.506 ablation, last checkpoint",
+   "seconds": 58
+  }
+ ],
+ "micro": {
+  "detect_s": 0.04477829998359084,
+  "read_tta1_s": 0.13086799997836351,
+  "read_tta8_s": 0.7617577998898923
+ },
+ "meta": {
+  "when": "2026-09-09T23:07",
+  "field_pots": 400,
+  "field_frames": 208,
+  "field_labelled": 31,
+  "field_blind": 13,
+  "archive_day": "2026-01-30"
+ }
+}
