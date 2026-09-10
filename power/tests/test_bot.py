@@ -190,3 +190,30 @@ def test_cmd_plot_all_sends_combined_photo(tmp_path, monkeypatch):
 
     context.bot.send_photo.assert_awaited_once()
     assert context.bot.send_photo.call_args.kwargs["caption"] == "Combined power usage since midnight"
+
+
+# --- chat allow-list -------------------------------------------------------------
+
+
+def test_allowed_chats_silences_other_chats(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(bot, "ALLOWED_CHATS", {456})
+    update = make_update(text="kahvi")
+    context = make_context()
+
+    run(bot.handle_message(update, context))
+    run(bot.cmd_brew(update, context))
+    run(bot.cmd_help(update, context))
+
+    context.bot.send_message.assert_not_awaited()
+
+
+def test_allowed_chats_admits_listed_chat(tmp_path, monkeypatch):
+    monkeypatch.setattr(plot, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(bot, "ALLOWED_CHATS", {123})
+    update = make_update()
+    context = make_context(args=["oikea"])
+
+    run(bot.cmd_brew(update, context))
+
+    context.bot.send_message.assert_awaited_once()

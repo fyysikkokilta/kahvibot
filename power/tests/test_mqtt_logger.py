@@ -109,3 +109,38 @@ def test_on_message_prunes_large_csv(tmp_path, monkeypatch):
         rows = list(csv.reader(f))
     assert rows[0] == ["timestamp", "power"]
     assert [r[1] for r in rows[1:]] == ["2.0", "3.0", "4.0"]
+
+
+# --- streaming brew detection --------------------------------------------------
+
+
+def test_brew_tracker_emits_start_and_end():
+    from datetime import datetime, timedelta, timezone
+
+    t0 = datetime(2026, 9, 10, 8, 0, tzinfo=timezone.utc)
+    tr = mqtt_logger.BrewTracker(start_threshold=300, end_threshold=250)
+    assert tr.update(t0, 90) is None                      # hotplate only
+    start = tr.update(t0 + timedelta(seconds=10), 1400)
+    assert start["event"] == "start"
+    assert start["t"] == (t0 + timedelta(seconds=10)).isoformat()
+    assert tr.update(t0 + timedelta(seconds=200), 1450) is None
+    assert tr.update(t0 + timedelta(seconds=300), 260) is None   # still above the end threshold
+    end = tr.update(t0 + timedelta(seconds=360), 95)
+    assert end["event"] == "end"
+    assert end["duration_s"] == 350.0
+    assert end["peak_w"] == 1450
+    assert tr.update(t0 + timedelta(seconds=400), 95) is None    # idle again
+
+
+def test_on_message_appends_brew_events(tmp_path, monkeypatch):
+    monkeypatch.setattr(mqtt_logger, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(mqtt_logger, "TRACKERS", {})
+    topic = f"{mqtt_logger.MQTT_BASE_TOPIC}/oikea"
+    for w in (5, 1400, 1400, 50, 5):
+        mqtt_logger.on_message(None, None, _msg(topic, json.dumps({"power": w}).encode()))
+
+    lines = mqtt_logger.brews_path("oikea").read_text().splitlines()
+    events = [json.loads(line) for line in lines]
+    assert [e["event"] for e in events] == ["start", "end"]
+    assert events[1]["peak_w"] == 1400.0
+    assert pd.to_datetime(events[1]["end"]).tz is not None

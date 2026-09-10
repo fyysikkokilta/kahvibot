@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 
 from config import (
+    BREW_THRESHOLD,
+    HEAT,
     MQTT_BROKER,
     MQTT_PORT,
     MQTT_USER,
@@ -29,6 +31,49 @@ PRUNE_KEEP_ROWS = 150_000
 
 def csv_path(device):
     return DATA_DIR / f"power_{device}.csv"
+
+
+def brews_path(device):
+    return DATA_DIR / f"brews_{device}.jsonl"
+
+
+class BrewTracker:
+    """Streaming twin of plot._hysteresis_events: a brew starts when power rises
+    above start_threshold and ends when it falls below end_threshold. update()
+    returns an event dict at those two moments and None otherwise, so brews are
+    recorded as they happen instead of being re-derived from the whole CSV on
+    every request."""
+
+    def __init__(self, start_threshold=BREW_THRESHOLD, end_threshold=HEAT):
+        self.start_threshold = float(start_threshold)
+        self.end_threshold = float(end_threshold)
+        self.start = None
+        self.peak = 0.0
+
+    def update(self, ts, power):
+        power = float(power)
+        if self.start is None:
+            if power > self.start_threshold:
+                self.start, self.peak = ts, power
+                return {"event": "start", "t": ts.isoformat(), "power": power}
+            return None
+        self.peak = max(self.peak, power)
+        if power < self.end_threshold:
+            ev = {"event": "end", "start": self.start.isoformat(), "end": ts.isoformat(),
+                  "duration_s": round((ts - self.start).total_seconds(), 1), "peak_w": self.peak}
+            self.start, self.peak = None, 0.0
+            return ev
+        return None
+
+
+def append_event(path, event):
+    """One JSON object per line. Never pruned: a few lines per brew is the
+    machine's whole history, and kahvibot reads the last line for its caption."""
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(event) + "\n")
+
+
+TRACKERS = {name: BrewTracker() for name in DEVICES}
 
 
 def ensure_csv(path):
@@ -83,9 +128,14 @@ def on_message(client, userdata, msg):
         power = float(payload.get("power"))
     except (TypeError, ValueError):
         return
-    ts = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    ts = now.isoformat()
     path = csv_path(dev_name)
     append_row(path, ts, power)
+    event = TRACKERS.setdefault(dev_name, BrewTracker()).update(now, power)
+    if event is not None:
+        append_event(brews_path(dev_name), event)
+        logger.info("[%s] %s: brew %s", ts, dev_name, event["event"])
     if path.stat().st_size > MAX_CSV_BYTES:
         prune_csv(path)
     logger.info("[%s] %s: %s W", ts, dev_name, power)

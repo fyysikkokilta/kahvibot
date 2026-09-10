@@ -30,6 +30,12 @@ except ImportError:
     RATE_LIMIT_SECONDS = 3.0
 RATE_LIMIT_SECONDS = float(RATE_LIMIT_SECONDS or 0)
 
+try:
+    from config import ALLOWED_CHATS
+except ImportError:
+    ALLOWED_CHATS = []
+ALLOWED_CHATS = {int(c) for c in (ALLOWED_CHATS or [])}
+
 COMMANDS = [
     ("plot", "Power plot for a device"),
     ("brew", "When was the last brew"),
@@ -54,11 +60,23 @@ def _throttled(chat_id, action):
     return False
 
 
+def _allowed(update: Update) -> bool:
+    """False when ALLOWED_CHATS is set and this chat is not in it. The bot then
+    stays silent: in a group it shares with kahvibot, both would otherwise answer
+    every "kahvi"."""
+    if not ALLOWED_CHATS:
+        return True
+    chat = update.effective_chat
+    return chat is not None and chat.id in ALLOWED_CHATS
+
+
 def pick_devices(context):
     return [context.args[0].lower()] if context.args else DEVICES
 
 
 async def cmd_plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _allowed(update):
+        return
     if _throttled(update.effective_chat.id, "plot"):
         await context.bot.send_message(
             update.effective_chat.id,
@@ -109,6 +127,8 @@ def _brew_caption(device):
 
 
 async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _allowed(update):
+        return
     if _throttled(update.effective_chat.id, "brew"):
         await context.bot.send_message(
             update.effective_chat.id, "Please wait a moment before asking again."
@@ -126,14 +146,16 @@ async def cmd_brew(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _allowed(update):
+        return
     text = (
         "Available commands:\n"
         "/plot [device] — power plot\n"
         f"Devices: {', '.join(DEVICES)}\n"
         "/brew — last brew info\n"
-        "/help — this menu"
-        "plaintext parsing and"
-        "underscore contcatenation supported"
+        "/help — this menu\n"
+        "Also: /plot_<device>, /brew_<device>, /plot all, and plain messages "
+        "with brew/kahvi/tsufe or plot/graph in them."
     )
     await context.bot.send_message(update.effective_chat.id, text)
 
@@ -148,6 +170,8 @@ async def run_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not _allowed(update) or update.message is None or not update.message.text:
+        return
     text = update.message.text.strip().lower()
     words = text.split()
     device = next((w for w in words if w in DEVICES), None)

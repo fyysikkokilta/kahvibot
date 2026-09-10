@@ -26,6 +26,7 @@ def _make_test_config():
     cfg.CUP_CALIBRATION = []
     cfg.ADMIN_CHAT_ID = None
     cfg.RATE_LIMIT_SECONDS = 0.0
+    cfg.ALLOWED_CHATS = []
     return cfg
 
 

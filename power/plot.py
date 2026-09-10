@@ -83,39 +83,41 @@ def get_csv_path(device=DEFAULT_DEVICE):
 
 
 def _hysteresis_events(df, start_threshold, end_threshold):
+    """Brews as (start, end, peak, duration) dicts.
+
+    Same rule as before: a brew starts at the first sample above start_threshold
+    and ends at the first later sample below end_threshold; a brew still running
+    at the end of the data is reported up to the last sample. Only the samples
+    that can change the state are visited, so a 150k-row CSV costs a few hundred
+    iterations instead of a pandas iterrows() over every row (tens of seconds on
+    a Raspberry Pi, once per /brew or /plot).
+    """
+    if df.empty:
+        return []
+    ts = df["timestamp"].reset_index(drop=True)
+    power = pd.to_numeric(df["power"], errors="coerce").to_numpy(dtype=float)
+    above = power > start_threshold
+    below = power < end_threshold
+
+    def event(i0, i1):
+        return {
+            "start": ts.iloc[i0],
+            "end": ts.iloc[i1],
+            "peak": float(np.nanmax(power[i0:i1 + 1])),
+            "duration": ts.iloc[i1] - ts.iloc[i0],
+        }
+
     events = []
-    in_brew = False
-    start_pos = None
-    peak = 0.0
-    for pos, row in df.iterrows():
-        p = float(row["power"])
-        if not in_brew:
-            if p > start_threshold:
-                in_brew = True
-                start_pos = pos
-                peak = p
-        else:
-            peak = max(peak, p)
-            if p < end_threshold:
-                events.append(
-                    {
-                        "start": df.loc[start_pos, "timestamp"],
-                        "end": row["timestamp"],
-                        "peak": peak,
-                        "duration": row["timestamp"] - df.loc[start_pos, "timestamp"],
-                    }
-                )
-                in_brew = False
-    if in_brew:
-        last = df.iloc[-1]
-        events.append(
-            {
-                "start": df.loc[start_pos, "timestamp"],
-                "end": last["timestamp"],
-                "peak": peak,
-                "duration": last["timestamp"] - df.loc[start_pos, "timestamp"],
-            }
-        )
+    start_i = None
+    for i in np.flatnonzero(above | below):
+        if start_i is None:
+            if above[i]:
+                start_i = int(i)
+        elif below[i]:
+            events.append(event(start_i, int(i)))
+            start_i = None
+    if start_i is not None:
+        events.append(event(start_i, len(power) - 1))
     return events
 
 

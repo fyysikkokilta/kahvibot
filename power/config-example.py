@@ -32,8 +32,18 @@ DEVICES = _env("DEVICES", "vasen,oikea").split(",")
 MQTT_BASE_TOPIC = _env("MQTT_BASE_TOPIC", "zigbee2mqtt")
 DEFAULT_DEVICE = _env("DEFAULT_DEVICE", "oikea")
 
+# A brew starts when power rises above BREW_THRESHOLD (the heating element
+# draws ~1.4 kW) and ends when it falls below HEAT. HEAT must sit clearly above
+# the hotplate's own draw (~100 W on a Moccamaster): with the plate cycling
+# around the threshold one brew splits into several and the durations that feed
+# the cup estimate become garbage. Look at /plot before lowering this.
 BREW_THRESHOLD = float(_env("BREW_THRESHOLD", "300"))
-HEAT = float(_env("HEAT", "100"))
+HEAT = float(_env("HEAT", "250"))
+
+# Telegram chat ids the bot answers in (commands and keyword triggers alike).
+# Empty = every chat it is a member of. Set this when the bot shares a group
+# with kahvibot, which reacts to the same keywords.
+ALLOWED_CHATS = [int(x) for x in _env("ALLOWED_CHATS", "").split(",") if x.strip()]
 PLOT_HOURS = float(_env("PLOT_HOURS", "24"))
 
 
