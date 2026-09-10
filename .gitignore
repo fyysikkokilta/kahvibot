@@ -97,3 +97,9 @@ ENV/
 # database dumps and dummy files
 db/dummy/
 db/dump/
+
+# runtime data of the power logger and the reader service
+power/data/
+reader/**/latest.json
+reader/**/readings-*.jsonl
+.pytest_cache/

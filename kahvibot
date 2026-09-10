@@ -15,6 +15,8 @@ import subprocess
 
 import socket
 
+import os
+
 import re
 
 import logging
@@ -77,13 +79,18 @@ coffee_reader_log = getattr(_config, "coffee_reader_log", "")
 camera_lock = getattr(_config, "camera_lock", "")
 # /graph: today's level curve. Off by default (GRAPHS.md §8 step 4).
 coffee_graph_enabled = getattr(_config, "coffee_graph_enabled", False)
-# Reader service (coffee10/pipeline, PIPELINE.md): the sampler daemon owns the
+# Reader service (reader/pipeline, reader/PIPELINE.md): the sampler daemon owns the
 # camera and the warm model, and hands the bot its freshest frame plus reading
 # over a local socket. Empty string (the default) = today's behaviour exactly.
 # Any error on this path falls back to the fswebcam + subprocess path below.
 reader_service_socket = getattr(_config, "reader_service_socket", "")
 reader_service_max_age = getattr(_config, "reader_service_max_age", 15.0)
 reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
+# Coffee-machine power plugs (power/): the MQTT logger appends brew start/end
+# events to <power_brews_dir>/brews_<device>.jsonl; the caption gets a "last
+# brewed" line per pot from them. Empty string (the default) = no such line.
+power_brews_dir = getattr(_config, "power_brews_dir", "")
+power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oikea"})
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -284,6 +291,54 @@ def _service_frame():
 POT_NAMES = {"left": "vasen pannu / left pot", "right": "oikea pannu / right pot"}
 
 
+def _ago(seconds: float) -> str:
+    """Compact age that reads the same in both languages: "12 min", "3 h 05 min", "2 d"."""
+    seconds = max(0, int(seconds))
+    if seconds < 3600:
+        return f"{seconds // 60} min"
+    if seconds < 86400:
+        return f"{seconds // 3600} h {(seconds % 3600) // 60:02d} min"
+    return f"{seconds // 86400} d"
+
+
+def _last_brew_event(device: str) -> Optional[dict]:
+    """Last line of the power logger's brews_<device>.jsonl, or None."""
+    path = os.path.join(power_brews_dir, f"brews_{device}.jsonl")
+    with open(path, "rb") as f:
+        f.seek(0, os.SEEK_END)
+        f.seek(max(0, f.tell() - 4096))
+        lines = [ln for ln in f.read().decode("utf-8", "replace").splitlines() if ln.strip()]
+    return json.loads(lines[-1]) if lines else None
+
+
+def brew_lines() -> str:
+    """
+    "Last brewed" caption lines from the coffee-machine power plugs (power/,
+    README there), one per pot that has an event. Independent of the camera
+    reading. Any failure returns "": the photo never waits on the plugs.
+    """
+    if not power_brews_dir:
+        return ""
+    now = datetime.now(timezone.utc)
+    out = []
+    for side, device in power_devices.items():
+        try:
+            ev = _last_brew_event(device)
+            if not ev:
+                continue
+            name = POT_NAMES.get(side, side)
+            if ev.get("event") == "start":
+                started = datetime.fromisoformat(ev["t"])
+                if (now - started).total_seconds() < 20 * 60:
+                    out.append(f"🫖 {name}: keittää nyt / brewing now")
+                continue
+            age = _ago((now - datetime.fromisoformat(ev["end"])).total_seconds())
+            out.append(f"🫖 {name}: keitetty {age} sitten / brewed {age} ago")
+        except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
+            logger.debug("no brew info for %s", device, exc_info=True)
+    return "\n".join(out)
+
+
 def format_reading(record: dict) -> str:
     """
     One caption line per detected pot, honest about precision: the model's
@@ -392,6 +447,9 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     caption = None
     if coffee_reader_show and reading is not None:
         caption = format_reading(reading) or None
+    brews = brew_lines()
+    if brews:
+        caption = (caption + "\n" + brews) if caption else brews
 
     offer = markup = None
     if survey and update.effective_user:

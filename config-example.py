@@ -48,7 +48,7 @@ camera_lock = ""
 # Show /graph (today's coffee level curve). Needs coffee_reader_log data.
 coffee_graph_enabled = False
 
-# --- Reader service (coffee10/pipeline, PIPELINE.md) -------------------------
+# --- Reader service (reader/pipeline, reader/PIPELINE.md) -------------------------
 # When set, the bot asks the resident reader service for its freshest frame and
 # reading instead of running fswebcam + a cold read_frame.py itself, and also
 # gets /graph from it. Any failure falls back to the local path above.
@@ -56,6 +56,13 @@ coffee_graph_enabled = False
 reader_service_socket = ""            # e.g. "/run/kahvi-sampler/ipc.sock"
 reader_service_max_age = 15.0         # reuse a service frame this many seconds old
 reader_service_timeout = 3.0          # seconds before falling back to the camera
+
+# --- Coffee-machine power plugs (power/, README there) -----------------------
+# Directory with the MQTT power logger's brews_<device>.jsonl event files.
+# When set, photo captions get a "keitetty 12 min sitten / brewed 12 min ago"
+# line per pot (or "brewing now"). "" = off.
+power_brews_dir = ""                  # e.g. "/home/konsta/kahvibot/power/data"
+power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
 
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
