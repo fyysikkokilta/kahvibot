@@ -13,6 +13,8 @@ from typing import Optional
 
 import subprocess
 
+import socket
+
 import re
 
 import logging
@@ -75,6 +77,13 @@ coffee_reader_log = getattr(_config, "coffee_reader_log", "")
 camera_lock = getattr(_config, "camera_lock", "")
 # /graph: today's level curve. Off by default (GRAPHS.md §8 step 4).
 coffee_graph_enabled = getattr(_config, "coffee_graph_enabled", False)
+# Reader service (coffee10/pipeline, PIPELINE.md): the sampler daemon owns the
+# camera and the warm model, and hands the bot its freshest frame plus reading
+# over a local socket. Empty string (the default) = today's behaviour exactly.
+# Any error on this path falls back to the fswebcam + subprocess path below.
+reader_service_socket = getattr(_config, "reader_service_socket", "")
+reader_service_max_age = getattr(_config, "reader_service_max_age", 15.0)
+reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -191,6 +200,86 @@ def read_coffee_level(image_path: str) -> Optional[dict]:
     return record
 
 
+def _reader_service_call(payload: dict):
+    """
+    One request to the reader service: a JSON line out, a JSON header line and
+    `header["bytes"]` raw bytes back. Returns (header, body) or None on any
+    failure, so callers fall back without having to think about it.
+    """
+    if not reader_service_socket:
+        return None
+    try:
+        if str(reader_service_socket).isdigit():          # dev box: loopback TCP
+            s = socket.create_connection(("127.0.0.1", int(reader_service_socket)),
+                                         timeout=reader_service_timeout)
+        else:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(reader_service_timeout)
+            s.connect(reader_service_socket)
+        try:
+            s.sendall(json.dumps(payload).encode("utf-8") + b"\n")
+            buf = b""
+            while b"\n" not in buf:              # header line; the body may follow in the same read
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+            line, _, rest = buf.partition(b"\n")
+            hdr = json.loads(line.decode("utf-8"))
+            n = int(hdr.get("bytes", 0))
+            body = bytearray(rest[:n])
+            while len(body) < n:
+                chunk = s.recv(min(65536, n - len(body)))
+                if not chunk:
+                    break
+                body += chunk
+            return hdr, bytes(body)
+        finally:
+            s.close()
+    except (OSError, ValueError):
+        logger.warning("reader service unavailable, using the camera directly", exc_info=True)
+        return None
+
+
+def _service_reading(hdr: dict) -> dict:
+    """
+    Widen the service's pots ({side,h,e,d,ml,tier,...}) to the record shape the
+    caption and the survey expect. `tier` is kept: "uncertain" readings are
+    captioned as approximate rather than hidden.
+    """
+    pots = []
+    for p in hdr.get("pots") or []:
+        tier = p.get("tier") or ("ok" if p.get("ok") else "abstain")
+        usable = tier != "abstain"
+        pots.append({
+            "side": p.get("side"), "ok": bool(usable), "tier": tier,
+            "volume_ml": p.get("ml") if usable else None,
+            "fill_fraction": p.get("fill") if usable else None,
+            "h_norm": p.get("h"), "surface_entropy": p.get("e"),
+            "detector_score": p.get("d"), "box": p.get("box"),
+            "rows_frame_px": p.get("rows"),
+            "reason": None if usable else "diffuse surface estimate (occluded or no visible surface)",
+        })
+    return {"pots": pots, "src": "service", "seq": hdr.get("seq"),
+            "age": hdr.get("age"), "reused": hdr.get("reused")}
+
+
+def _service_frame():
+    """(PIL image, reading, raw jpeg) from the reader service, or None."""
+    res = _reader_service_call({"op": "frame", "max_age": reader_service_max_age})
+    if not res:
+        return None
+    hdr, body = res
+    if not hdr.get("ok") or not body:
+        return None
+    try:
+        img = Image.open(BytesIO(body))
+        img.load()
+    except OSError:
+        return None
+    return img, _service_reading(hdr), body
+
+
 # Display names for the two camera-frame sides.
 POT_NAMES = {"left": "vasen pannu / left pot", "right": "oikea pannu / right pot"}
 
@@ -215,6 +304,8 @@ def format_reading(record: dict) -> str:
                 cups = (str(whole) if whole else "") + ("½" if half_cups != whole else "")
                 unit = "kuppi / cup" if half_cups == 1.0 else "kuppia / cups"
                 amount = f"~{cups} {unit}"
+            if pot.get("tier") == "uncertain":
+                amount = f"n. {amount} (epävarma / uncertain)"
             lines.append(f"☕ {name}: {amount}")
         else:
             lines.append(f"☕ {name}: en näe pintaa / can't tell")
@@ -227,7 +318,15 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     pillow image, plus the coffee level reading (or None) measured from the
     frame on disk before it is watermarked or re-encoded, plus the raw
     pre-watermark JPEG bytes (the survey caches the frame the reader saw).
+
+    With a reader service configured, the frame and its reading come from the
+    service (a frame younger than reader_service_max_age is reused, otherwise
+    the service captures one), and the service is the one that logs it. The
+    camera path below is the fallback and the default.
     """
+    got = _service_frame()
+    if got is not None:
+        return got
     with NamedTemporaryFile(suffix=".jpg") as f:
         # Use the option "-S 20" to discard 20 frames before taking the picture,
         # so that the camera has time to adjust the brightness automatically.
@@ -265,7 +364,13 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
 def send_webcam_photo(update: Update, ctx: CallbackContext):
     bot = ctx.bot
 
-    update.message.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
+    # effective_message, not message: the trigger-word filter also matches
+    # edited messages and channel posts, where update.message is None (this was
+    # the AttributeError seen 8 times in the 2026 journal).
+    msg = update.effective_message
+    if msg is None:
+        return
+    msg.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
     img, reading, raw = take_picture()
 
@@ -295,11 +400,9 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
         if extra:
             caption = (caption + "\n\n" + extra) if caption else extra
 
-    msg = update.message
-    if msg:
-        sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
-        if survey:
-            survey.register_photo(sent, raw, reading, offer)
+    sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
+    if survey:
+        survey.register_photo(sent, raw, reading, offer)
 
 
 def send_graph(update: Update, ctx: CallbackContext):
@@ -314,8 +417,15 @@ def send_graph(update: Update, ctx: CallbackContext):
     if not coffee_graph_enabled:
         return  # feature off: stay silent, same as any unknown command
     try:
-        import graphs
-        png, caption = graphs.graph_reply(coffee_reader_log)
+        # The reader service keeps today's series in memory and caches the
+        # render on the last usable reading (PIPELINE.md); parsing the log
+        # here is the fallback.
+        res = _reader_service_call({"op": "graph"})
+        if res and res[0].get("ok"):
+            png, caption = (res[1] or None), res[0].get("caption")
+        else:
+            import graphs
+            png, caption = graphs.graph_reply(coffee_reader_log)
     except Exception:
         logger.warning("graph render failed", exc_info=True)
         png = None

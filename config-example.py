@@ -48,6 +48,15 @@ camera_lock = ""
 # Show /graph (today's coffee level curve). Needs coffee_reader_log data.
 coffee_graph_enabled = False
 
+# --- Reader service (coffee10/pipeline, PIPELINE.md) -------------------------
+# When set, the bot asks the resident reader service for its freshest frame and
+# reading instead of running fswebcam + a cold read_frame.py itself, and also
+# gets /graph from it. Any failure falls back to the local path above.
+# Path of the AF_UNIX socket (kahvi-reader.service), or a TCP port on a dev box.
+reader_service_socket = ""            # e.g. "/run/kahvi-sampler/ipc.sock"
+reader_service_max_age = 15.0         # reuse a service frame this many seconds old
+reader_service_timeout = 3.0          # seconds before falling back to the camera
+
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
 coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @
