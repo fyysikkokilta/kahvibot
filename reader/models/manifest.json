@@ -1,0 +1,35 @@
+{
+  "reader_outputs": [
+    "h_norm",
+    "y_base",
+    "y_top",
+    "y_surf",
+    "usable_logit",
+    "surface_logit",
+    "entropy"
+  ],
+  "reader": {
+    "arch": "resnet18",
+    "rows": 256,
+    "crop_w": 128,
+    "cache_h": 320,
+    "cache_w": 160,
+    "params": 2801392,
+    "checkpoint": "_work/model_v8/best.pt",
+    "file": "reader.onnx",
+    "bytes": 160135
+  },
+  "fastbox": {
+    "in_h": 96,
+    "in_w": 160,
+    "params": 284402,
+    "outputs": [
+      "boxes",
+      "present_logit"
+    ],
+    "checkpoint": "_work/fastbox.pt",
+    "file": "fastbox.onnx",
+    "bytes": 60809
+  },
+  "calibration": "calibration.json"
+}

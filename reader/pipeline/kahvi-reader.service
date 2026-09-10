@@ -1,0 +1,50 @@
+# Coffee reader service: the one process that owns the camera and the model.
+# Replaces kahvisampler.service (sampler.py). kahvibot talks to it over
+# /run/kahvi-sampler/ipc.sock and falls back to its own fswebcam path if the
+# socket is dead, so this unit can be stopped at any time without taking the bot down.
+#
+# Changes vs kahvisampler.service, each traceable to kahviraspi_logs_2026-09-09/ANALYSIS.md:
+#   * CPUQuota 25% -> 60%: the 25% quota turned the 10 s sampler into a 33 s one
+#     (§2). Nice=19 + SCHED_IDLE already yield to the bot and anything else.
+#   * no TTA probe ticks (each cost ~100 s of blindness), no "no ok reading" backoff
+#   * StartLimit* moved to [Unit] where systemd actually reads them
+#   * gate defaults 0.62/0.68 (ANALYSIS.md §1.4); the reader still logs entropy,
+#     so the gate can be moved again without touching the model
+
+[Unit]
+Description=Coffee level reader service (camera + model + IPC)
+After=time-sync.target network-online.target
+Wants=time-sync.target
+StartLimitIntervalSec=1h
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=konsta
+Group=konsta
+SupplementaryGroups=video
+ExecStart=/home/konsta/coffee-reader/venv/bin/python /home/konsta/coffee-reader/pipeline/run_daemon.py \
+    --model-dir /home/konsta/coffee-reader \
+    --log /home/konsta/coffee-reader/readings-%%Y-%%m.jsonl \
+    --graphs /home/marci/dev/kiltiskahvi/graphs.py \
+    --interval 10 --gate-mode agree --agree-ok-ml 40 --agree-uncertain-ml 90 \
+    --gate-ok 0.62 --gate-uncertain 0.68
+RuntimeDirectory=kahvi-sampler
+RuntimeDirectoryMode=0775
+StateDirectory=kahvi-sampler
+
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+CPUQuota=60%
+MemoryHigh=200M
+MemoryMax=260M
+OOMScoreAdjust=500
+
+Restart=always
+RestartSec=30
+LogRateLimitIntervalSec=60
+LogRateLimitBurst=20
+
+[Install]
+WantedBy=multi-user.target

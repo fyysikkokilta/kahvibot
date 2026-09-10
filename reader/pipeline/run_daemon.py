@@ -1,0 +1,83 @@
+"""Pi entry point: python run_daemon.py --model-dir /home/konsta/coffee-reader ...
+
+Replaces sampler.py as kahvisampler.service's ExecStart. Same camera arguments,
+same log location; adds the IPC socket the bot talks to.
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from pipeline.camera import FswebcamCamera          # noqa: E402
+from pipeline.clock import RealClock                # noqa: E402
+from pipeline.gate import Gate                      # noqa: E402
+from pipeline.graphing import load_kahvibot_graphs  # noqa: E402
+from pipeline.ipc import serve_forever              # noqa: E402
+from pipeline.reader import WarmReader              # noqa: E402
+from pipeline.service import ReaderService, ServiceConfig  # noqa: E402
+from pipeline.store import ReadingsStore            # noqa: E402
+
+
+def main(argv=None) -> int:
+    here = Path(__file__).resolve().parent
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--model-dir", default=str(here.parent))
+    ap.add_argument("--log", default=None, help="readings JSONL strftime pattern")
+    ap.add_argument("--run-dir", default=os.environ.get("RUNTIME_DIRECTORY", "/run/kahvi-sampler"))
+    ap.add_argument("--lock", default="/run/lock/kahvicam.lock")
+    ap.add_argument("--socket", default=None, help="AF_UNIX path (default <run-dir>/ipc.sock) or TCP port")
+    ap.add_argument("--graphs", default="/home/marci/dev/kiltiskahvi/graphs.py")
+    ap.add_argument("--interval", type=float, default=10.0)
+    ap.add_argument("--dark-interval", type=float, default=60.0)
+    ap.add_argument("--detect-every", type=int, default=6)
+    ap.add_argument("--tta-probe-every", type=int, default=0)
+    ap.add_argument("--reuse-max-age", type=float, default=15.0)
+    ap.add_argument("--gate-ok", type=float, default=0.62, help="entropy tier limit (fallback / entropy mode)")
+    ap.add_argument("--gate-uncertain", type=float, default=0.68)
+    ap.add_argument("--gate-mode", default="agree", choices=["entropy", "agree"],
+                    help="agree: a reading is ok when it agrees with the previous one of the same pot "
+                         "(gym/GATE3_*.md); entropy is only the fallback without a recent neighbour")
+    ap.add_argument("--agree-ok-ml", type=float, default=40.0)
+    ap.add_argument("--agree-uncertain-ml", type=float, default=90.0)
+    ap.add_argument("--threads", type=int, default=2)
+    a = ap.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s")
+
+    model_dir = Path(a.model_dir)
+    run_dir = Path(a.run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_pattern = a.log or str(model_dir / "readings-%Y-%m.jsonl")
+    sock = a.socket or str(run_dir / "ipc.sock")
+    if sock.isdigit():
+        sock = int(sock)
+
+    clock = RealClock()
+    camera = FswebcamCamera(clock, lock_path=a.lock, tmp_path=str(run_dir / "frame.jpg"))
+    reader = WarmReader(model_dir, threads=a.threads)
+    store = ReadingsStore(log_pattern, clock, latest_path=str(model_dir / "latest.json"))
+    graphs_mod = None
+    if a.graphs and Path(a.graphs).is_file():
+        try:
+            graphs_mod = load_kahvibot_graphs(a.graphs)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("kahvi").warning("graphs module unavailable", exc_info=True)
+    cfg = ServiceConfig(interval=a.interval, dark_interval=a.dark_interval,
+                        detect_every=a.detect_every, tta_probe_every=a.tta_probe_every,
+                        reuse_max_age=a.reuse_max_age)
+    gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
+                agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
+    svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)
+    logging.getLogger("kahvi").info("reader service up: interval=%.0fs socket=%s gate=%s e<=%.2f/%.2f a<=%.0f/%.0f ml",
+                                    a.interval, sock, a.gate_mode, a.gate_ok, a.gate_uncertain,
+                                    a.agree_ok_ml, a.agree_uncertain_ml)
+    serve_forever(svc, sock)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
