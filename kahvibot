@@ -97,6 +97,11 @@ reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
 # brewed" line per pot from them. Empty string (the default) = no such line.
 power_brews_dir = getattr(_config, "power_brews_dir", "")
 power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oikea"})
+# Caption text on replies the whole group sees. Off during burn-in: the photo
+# and the graph go out bare, while the survey button still appears, so people
+# can still annotate without the bot narrating numbers it is not yet sure of.
+# Error replies are unaffected - a silent failure is worse than a line of text.
+caption_text_enabled = getattr(_config, "caption_text_enabled", False)
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -451,17 +456,21 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.seek(0)
 
     caption = None
-    if coffee_reader_show and reading is not None:
-        caption = format_reading(reading) or None
-    brews = brew_lines()
-    if brews:
-        caption = (caption + "\n" + brews) if caption else brews
+    if caption_text_enabled:
+        if coffee_reader_show and reading is not None:
+            caption = format_reading(reading) or None
+        brews = brew_lines()
+        if brews:
+            caption = (caption + "\n" + brews) if caption else brews
 
     offer = markup = None
     if survey and update.effective_user:
         offer = survey.maybe_offer(update.effective_user.id, reading)
+        # reading_shown gates the "is this reading wrong?" prompt, which makes no
+        # sense when no reading is on screen; the randomly offered help button
+        # does not depend on it and still appears.
         extra, markup = survey.decorate(offer, reading_shown=bool(caption))
-        if extra:
+        if extra and caption_text_enabled:
             caption = (caption + "\n\n" + extra) if caption else extra
 
     sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
@@ -490,6 +499,8 @@ def send_graph(update: Update, ctx: CallbackContext):
         else:
             import graphs
             png, caption = graphs.graph_reply(coffee_reader_log)
+        if png is not None and not caption_text_enabled:
+            caption = None          # the graph is the message; no narration
     except Exception:
         logger.warning("graph render failed", exc_info=True)
         png = None

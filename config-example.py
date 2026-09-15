@@ -79,6 +79,12 @@ reader_service_timeout = 3.0          # seconds before falling back to the camer
 power_brews_dir = ""                  # e.g. "/home/konsta/kahvibot/power/data"
 power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
 
+# Caption text on replies the whole group sees (photo readings, "last brewed",
+# the survey invitation, the graph caption). False = pictures only, which is
+# the burn-in setting: the survey button still appears so people can annotate,
+# and error replies still speak. Set True once the numbers are trusted.
+caption_text_enabled = False
+
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
 coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @
