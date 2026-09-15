@@ -86,12 +86,14 @@ class Request:
 class IPCServer(threading.Thread):
     """Accepts connections and hands Requests to the service loop via a queue."""
 
-    def __init__(self, addr, inbox: "queue.Queue[Request]", timeout: float = 5.0):
+    def __init__(self, addr, inbox: "queue.Queue[Request]", timeout: float = 5.0,
+                 service=None):
         super().__init__(daemon=True, name="kahvi-ipc")
         self.sock = _bind(addr)
         self.sock.listen(8)
         self.inbox = inbox
         self.timeout = timeout
+        self.service = service
         self.stop = threading.Event()
 
     def run(self):
@@ -113,6 +115,12 @@ class IPCServer(threading.Thread):
                 payload = json.loads(line.decode("utf-8"))
             except ValueError:
                 payload = {"op": "bad"}
+            fast = self._fast_frame(payload)
+            if fast is not None:
+                hdr, body = fast
+                hdr["bytes"] = len(body)
+                conn.sendall(json.dumps(hdr).encode("utf-8") + b"\n" + body)
+                return
             req = Request(payload)
             self.inbox.put(req)
             if not req.done.wait(self.timeout):
@@ -125,6 +133,38 @@ class IPCServer(threading.Thread):
             pass
         finally:
             conn.close()
+
+
+    def _fast_frame(self, payload):
+        """Serve a frame young enough to reuse, without waiting for the loop.
+
+        Only the reuse case qualifies: it reads an already-captured frame and the
+        reading computed with it, touching neither camera nor model, so nothing
+        here can race the service's own tick. Anything needing a new capture goes
+        through the queue as before. Returns (header, body) or None.
+        """
+        svc = self.service
+        if svc is None or payload.get("op") != "frame":
+            return None
+        try:
+            lit = svc.last_lit                      # one atomic attribute read
+            if lit is None:
+                return None
+            max_age = payload.get("max_age")
+            max_age = svc.cfg.reuse_max_age if max_age is None else float(max_age)
+            age = svc.clock.mono() - lit.frame.captured_mono
+            if age > max_age:
+                return None
+            svc.stats.requests += 1
+            svc.stats.requests_reused += 1
+            svc.stats.request_photo_latency.append(0.0)
+            svc.stats.request_reading_latency.append(0.0)
+            return ({"ok": True, "age": round(age, 2), "reused": True, "seq": lit.seq,
+                     "pots": lit.pots, "captured_at": lit.frame.captured_wall,
+                     "fast": True},
+                    lit.frame.jpeg)
+        except Exception:  # noqa: BLE001 - fall back to the queue, never fail here
+            return None
 
 
 def execute(service, req: Request) -> None:
@@ -176,7 +216,7 @@ class Client:
 def serve_forever(service, addr, poll_s: float = 0.25):
     """Daemon main loop: requests first, then due ticks, then a short sleep."""
     inbox: "queue.Queue[Request]" = queue.Queue()
-    server = IPCServer(addr, inbox)
+    server = IPCServer(addr, inbox, service=service)
     server.start()
     try:
         while True:

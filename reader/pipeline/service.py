@@ -102,7 +102,10 @@ class ServiceConfig:
     tta_probe_every: int = 0          # DELTA: default off; each probe cost ~100 s on the Pi
     blind_after_nodetect: int = 30    # DELTA: back off on "no carafe", not "no ok reading"
     jump_ml: float = 300.0
-    reuse_max_age: float = 15.0       # bot frames younger than this are reused
+    reuse_max_age: float = 15.0
+    # how stale a held frame may be before it is worth making the caller
+    # wait for a new capture instead
+    stale_max_age: float = 90.0       # bot frames younger than this are reused
     request_tta: int = 1              # DELTA: no TTA in the request path
     flush_sec: float = 60.0
     graph_ttl_s: float = 600.0
@@ -321,12 +324,23 @@ class ReaderService:
                 self.stats.request_photo_latency.append(0.0)
                 self.stats.request_reading_latency.append(0.0)
                 return FrameResult(self.last_lit.frame, self.last_lit.pots, age, True, self.last_lit.seq)
-        fr = None
-        for _ in range(3):
-            fr = self._capture()
+        # One attempt first. Retrying costs a second each time, and the bot's
+        # socket timeout is shorter than three retries plus a capture, so a busy
+        # camera used to blow the deadline and the request was lost anyway.
+        # A frame we already hold beats a frame that arrives after the caller
+        # has given up.
+        fr = self._capture()
+        if fr is None and self.last_lit is not None:
+            age = self.clock.mono() - self.last_lit.frame.captured_mono
+            if age <= self.cfg.stale_max_age:
+                self.stats.requests_reused += 1
+                return FrameResult(self.last_lit.frame, self.last_lit.pots, age, True,
+                                   self.last_lit.seq)
+        for _ in range(2):
             if fr is not None:
                 break
-            self.clock.sleep(1.0)           # camera busy/failed: brief retry
+            self.clock.sleep(1.0)           # nothing usable in hand: keep trying
+            fr = self._capture()
         if fr is None:
             # The camera is busy - usually this service's own tick holds the
             # lock. Returning None sends the bot off to a cold fswebcam plus a
