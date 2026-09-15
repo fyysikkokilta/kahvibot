@@ -328,6 +328,16 @@ class ReaderService:
                 break
             self.clock.sleep(1.0)           # camera busy/failed: brief retry
         if fr is None:
+            # The camera is busy - usually this service's own tick holds the
+            # lock. Returning None sends the bot off to a cold fswebcam plus a
+            # cold model read, which is slower and produces a worse reading than
+            # the frame already in hand. Hand back what we have, with its true
+            # age, and let the caller decide.
+            if self.last_lit is not None:
+                self.stats.requests_reused += 1
+                age = self.clock.mono() - self.last_lit.frame.captured_mono
+                return FrameResult(self.last_lit.frame, self.last_lit.pots, age, True,
+                                   self.last_lit.seq)
             return None
         self.stats.requests_captured += 1
         photo_ready = self.clock.mono()

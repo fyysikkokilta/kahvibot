@@ -72,6 +72,17 @@ def main(argv=None) -> int:
     gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
                 agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
     svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)
+    # Recover today's readings from the log. Without this a restart or a power
+    # cut makes /graph answer "not enough readings yet" for an hour, even though
+    # the whole day is already on disk in the file this service wrote.
+    try:
+        now = clock.wall()
+        seeded = svc.daybuf.seed_from_log(store.path_for(now), now)
+        if seeded:
+            logging.getLogger("kahvi").info("recovered %d of today's readings from %s",
+                                            seeded, store.path_for(now))
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kahvi").warning("could not recover today's readings", exc_info=True)
     logging.getLogger("kahvi").info("reader service up: interval=%.0fs socket=%s gate=%s e<=%.2f/%.2f a<=%.0f/%.0f ml",
                                     a.interval, sock, a.gate_mode, a.gate_ok, a.gate_uncertain,
                                     a.agree_ok_ml, a.agree_uncertain_ml)

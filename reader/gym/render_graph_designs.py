@@ -178,7 +178,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
     fig = plt.figure(figsize=(10, 8.0), dpi=100)
     fig.patch.set_facecolor(BG)
     gs = fig.add_gridspec(4, 1, height_ratios=[3.2, 0.95, 3.2, 0.95],
-                          hspace=0.20, left=0.105, right=0.935, top=0.975, bottom=0.065)
+                          hspace=0.20, left=0.105, right=0.905, top=0.975, bottom=0.065)
     lt_pad = lt1 + timedelta(minutes=12)          # room to the right of "now"
     for i, side in enumerate(("left", "right")):
         s = series[side]
@@ -203,6 +203,10 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
         axt.set_yticks([20, 60, 100])
         axt.set_yticklabels(["20", "60", "100"], fontsize=18, color=TEMP)
         axt.tick_params(axis="y", colors=TEMP)
+        # the level axis says ml and the power strip says W; temperature needs
+        # its unit too, or the right-hand numbers are just numbers
+        axt.set_ylabel("°C", color=TEMP, fontsize=19, rotation=0,
+                       labelpad=14, va="center")
         for sp in axt.spines.values():
             sp.set_color(FRAME)
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
