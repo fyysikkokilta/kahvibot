@@ -39,7 +39,11 @@ DARK, BODY, DIM, FOOT = "#1a1a1a", "#2b2b2b", "#5a5a5a", "#6a6a6a"
 COL = {"left": "#1f77b4", "right": "#e07b00"}
 BREW = "#2ca02c"
 BAND = "#b9b3ab"
-POT_LABEL = {"left": "LEFT", "right": "RIGHT"}
+TEMP = "#a8322d"          # temperature: inferred, never measured
+# Compass names, not left/right: which pot is "left" depends on whether you
+# are the camera or a person standing at the machines, and that ambiguity has
+# already caused one wrong plug mapping. The camera's right-hand pot is west.
+POT_LABEL = {"left": "EAST", "right": "WEST"}
 CUP_ML = 125.0
 HOURS = 3.0
 ROWS, Y_BASE, Y_TOP = 256, 0.88, 0.12
@@ -154,7 +158,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
     fig = plt.figure(figsize=(10, 8.0), dpi=100)
     fig.patch.set_facecolor(BG)
     gs = fig.add_gridspec(4, 3, height_ratios=[3.2, 0.95, 3.2, 0.95],
-                          width_ratios=[3.2, 3.2, 1.9], hspace=0.20, wspace=0.10,
+                          width_ratios=[3.2, 3.2, 1.75], hspace=0.20, wspace=0.26,
                           left=0.068, right=0.978, top=0.895, bottom=0.055)
     fig.text(0.03, 0.965, "Guild room coffee", fontsize=28,
              fontweight="bold", color=DARK, va="top")
@@ -166,6 +170,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
         s = series[side]
         t = [loc(x[0]) for x in s]
         med = np.array([x[1] for x in s]); lo = np.array([x[2] for x in s]); hi = np.array([x[3] for x in s])
+        temp = np.array([x[4] for x in s])
 
         # big number block
         axn = fig.add_subplot(gs[2 * i, 2]); axn.axis("off")
@@ -173,8 +178,10 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
                  color=COL[side], va="center", ha="left")
         axn.text(0.14 + 0.21 * len(cups_text(med[-1])), 0.50, "cups", fontsize=26,
                  color=BODY, va="center", ha="left")
-        axn.text(0.10, 0.20, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
+        axn.text(0.10, 0.26, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
                  color=DARK, va="center", ha="left")
+        axn.text(0.10, 0.02, f"{temp[-1]:.0f} \u00b0C", fontsize=27, fontweight="bold",
+                 color=TEMP, va="center", ha="left")
         axn.text(0.10, 0.97, POT_LABEL[side], fontsize=24, fontweight="bold", color=DIM,
                  va="center", ha="left")
 
@@ -188,6 +195,14 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
         ax.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
         ax.set_yticks([0, 250, 500, 750, 1000, 1250])
         ax.set_yticklabels(["0", "2", "4", "6", "8", "10"], fontsize=22)
+        axt = ax.twinx()
+        axt.plot(t, temp, color=TEMP, linewidth=2.4, linestyle=(0, (6, 3)), zorder=4)
+        axt.set_ylim(0, 100); axt.set_xlim(lt0, lt_pad)
+        axt.set_yticks([20, 60, 100])
+        axt.set_yticklabels(["20", "60", "100"], fontsize=18, color=TEMP)
+        axt.tick_params(axis="y", colors=TEMP)
+        for sp in axt.spines.values():
+            sp.set_color(FRAME)
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         ax.set_xticklabels([])
 
@@ -200,7 +215,9 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
         # axis itself is dropped because the shape is the message, not the watts
         axp.set_yscale("log"); axp.set_ylim(1, 3000); axp.set_xlim(lt0, lt_pad)
         axp.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
-        axp.set_yticks([])
+        axp.yaxis.tick_right()
+        axp.set_yticks([100, 1000])
+        axp.set_yticklabels(["100 W", "1 kW"], fontsize=15)
         axp.axhline(800, color=BREW, linewidth=1, linestyle=":")
         for a, b in brew_spans(power[side], t0, t1):
             axp.axvspan(a, b, color=BREW, alpha=0.13, zorder=0)
@@ -208,6 +225,81 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
         if i == 0:
             axp.set_xticklabels([])
     fig.savefig(OUT / "A_stacked.png", facecolor=BG)
+    plt.close(fig)
+
+
+
+def variant_d(series, power, t0, t1, now, lt0, lt1):
+    """Both pots on shared axes: one level panel, one temperature panel, one
+    power panel. Fewer frames to read, and the two machines become directly
+    comparable - at the cost of two curves crossing in the same space."""
+    fig = plt.figure(figsize=(10, 8.0), dpi=100)
+    fig.patch.set_facecolor(BG)
+    gs = fig.add_gridspec(3, 2, height_ratios=[3.3, 1.5, 1.1],
+                          width_ratios=[6.4, 1.9], hspace=0.20, wspace=0.22,
+                          left=0.105, right=0.978, top=0.895, bottom=0.055)
+    fig.text(0.03, 0.965, "Guild room coffee", fontsize=28, fontweight="bold",
+             color=DARK, va="top")
+    fig.text(0.978, 0.965, now.strftime("last 3 h  \u00b7  %d %b, %H:%M"), ha="right",
+             va="top", fontsize=19, color=DIM)
+    lt_pad = lt1 + timedelta(minutes=12)
+
+    def nowline(ax):
+        ax.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
+
+    axl = fig.add_subplot(gs[0, 0]); style(axl, 22)
+    axt = fig.add_subplot(gs[1, 0]); style(axt, 20)
+    axp = fig.add_subplot(gs[2, 0]); style(axp, 18)
+    axn = fig.add_subplot(gs[:, 1]); axn.axis("off")
+
+    for i, side in enumerate(("left", "right")):
+        s = series[side]
+        t = [loc(x[0]) for x in s]
+        med = np.array([x[1] for x in s]); lo = np.array([x[2] for x in s])
+        hi = np.array([x[3] for x in s]); temp = np.array([x[4] for x in s])
+
+        axl.fill_between(t, lo, hi, color=BAND, alpha=0.40, linewidth=0)
+        axl.plot(t, med, color=COL[side], linewidth=5.2)
+        axt.plot(t, temp, color=COL[side], linewidth=3.4)
+        pw = [(loc(ts), w) for ts, w in power[side] if t0 <= ts <= t1]
+        if pw:
+            axp.plot([q[0] for q in pw], [max(q[1], 1.0) for q in pw], color=COL[side],
+                     linewidth=2.8, drawstyle="steps-post")
+        for aa, bb in brew_spans(power[side], t0, t1):
+            for ax in (axl, axt, axp):
+                ax.axvspan(aa, bb, color=BREW, alpha=0.13, zorder=0)
+
+        y = 0.94 - i * 0.50
+        axn.text(0.10, y, POT_LABEL[side], fontsize=24, fontweight="bold", color=COL[side],
+                 va="center", ha="left")
+        axn.text(0.10, y - 0.15, cups_text(med[-1]), fontsize=60, fontweight="bold",
+                 color=COL[side], va="center", ha="left")
+        axn.text(0.14 + 0.20 * len(cups_text(med[-1])), y - 0.19, "cups", fontsize=24,
+                 color=BODY, va="center", ha="left")
+        axn.text(0.10, y - 0.29, f"{med[-1]:.0f} ml", fontsize=29, fontweight="bold",
+                 color=DARK, va="center", ha="left")
+        axn.text(0.10, y - 0.38, f"{temp[-1]:.0f} \u00b0C", fontsize=25, fontweight="bold",
+                 color=TEMP, va="center", ha="left")
+
+    axl.set_ylim(0, 1300); axl.set_xlim(lt0, lt_pad)
+    axl.set_yticks([0, 250, 500, 750, 1000, 1250])
+    axl.set_yticklabels(["0", "2", "4", "6", "8", "10"], fontsize=22)
+    axl.set_ylabel("cups", color=BODY, fontsize=19)
+    axl.set_xticklabels([]); nowline(axl)
+
+    axt.set_ylim(0, 100); axt.set_xlim(lt0, lt_pad)
+    axt.set_yticks([20, 60, 100]); axt.set_yticklabels(["20", "60", "100"], fontsize=19)
+    axt.set_ylabel("\u00b0C", color=BODY, fontsize=19, rotation=0, labelpad=16, va="center")
+    axt.set_xticklabels([]); nowline(axt)
+
+    axp.set_yscale("log"); axp.set_ylim(1, 3000); axp.set_xlim(lt0, lt_pad)
+    axp.yaxis.tick_right()
+    axp.set_yticks([100, 1000]); axp.set_yticklabels(["100 W", "1 kW"], fontsize=15)
+    axp.axhline(800, color=BREW, linewidth=1, linestyle=":")
+    axp.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    nowline(axp)
+
+    fig.savefig(OUT / "D_merged.png", facecolor=BG)
     plt.close(fig)
 
 
@@ -332,6 +424,7 @@ def main():
     variant_a(series, power, t0, t1, now.astimezone(), lt0, lt1)
     variant_b(series, power, t0, t1, now.astimezone(), lt0, lt1)
     variant_c(series, power, t0, t1, now.astimezone(), lt0, lt1)
+    variant_d(series, power, t0, t1, now.astimezone(), lt0, lt1)
     for p in sorted(OUT.glob("*.png")):
         print("wrote", p, f"{p.stat().st_size // 1024} kB")
 
