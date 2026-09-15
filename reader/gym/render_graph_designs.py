@@ -177,14 +177,8 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
     """Two stacked pot panels, each with its own power strip. Numbers on the left."""
     fig = plt.figure(figsize=(10, 8.0), dpi=100)
     fig.patch.set_facecolor(BG)
-    gs = fig.add_gridspec(4, 3, height_ratios=[3.2, 0.95, 3.2, 0.95],
-                          width_ratios=[3.2, 3.2, 1.75], hspace=0.20, wspace=0.26,
-                          left=0.105, right=0.978, top=0.895, bottom=0.055)
-    fig.text(0.03, 0.965, "Guild room coffee", fontsize=28,
-             fontweight="bold", color=DARK, va="top")
-    fig.text(0.975, 0.965, now.strftime("last 3 h  ·  %d %b, %H:%M"), ha="right", va="top",
-             fontsize=19, color=DIM)
-
+    gs = fig.add_gridspec(4, 1, height_ratios=[3.2, 0.95, 3.2, 0.95],
+                          hspace=0.20, left=0.105, right=0.935, top=0.975, bottom=0.065)
     lt_pad = lt1 + timedelta(minutes=12)          # room to the right of "now"
     for i, side in enumerate(("left", "right")):
         s = series[side]
@@ -192,21 +186,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
         med = np.array([x[1] for x in s]); lo = np.array([x[2] for x in s]); hi = np.array([x[3] for x in s])
         temp = np.array([x[4] for x in s])
 
-        # big number block
-        axn = fig.add_subplot(gs[2 * i, 2]); axn.axis("off")
-        ml_block(axn, 0.10, 0.48, med[-1], COL[side])
-        axn.text(0.10, 0.12, f"{temp[-1]:.0f} \u00b0C", fontsize=30, fontweight="bold",
-                 color=TEMP, va="center", ha="left")
-        if show_name:
-            axn.text(0.10, 0.99, POT_LABEL[side], fontsize=24, fontweight="bold",
-                     color=DIM, va="center", ha="left")
-            axn.text(0.10, 0.85, "coffee machine", fontsize=15, color=DIM,
-                     va="center", ha="left")
-        else:
-            axn.text(0.10, 0.92, "coffee machine", fontsize=15, color=DIM,
-                     va="center", ha="left")
-
-        ax = fig.add_subplot(gs[2 * i, 0:2]); style(ax, 22)
+        ax = fig.add_subplot(gs[2 * i, 0]); style(ax, 22)
         ax.fill_between(t, lo, hi, color=BAND, alpha=0.45, linewidth=0,
                         label="95 % luottamusväli")
         ax.plot(t, med, color=COL[side], linewidth=5.2)
@@ -228,7 +208,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         ax.set_xticklabels([])
 
-        axp = fig.add_subplot(gs[2 * i + 1, 0:2]); style(axp, 20)
+        axp = fig.add_subplot(gs[2 * i + 1, 0]); style(axp, 20)
         pw = [(loc(ts), w) for ts, w in power[side] if t0 <= ts <= t1]
         if pw:
             axp.plot([p[0] for p in pw], [max(p[1], 1.0) for p in pw], color=BODY,
@@ -237,7 +217,6 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
         # axis itself is dropped because the shape is the message, not the watts
         axp.set_yscale("log"); axp.set_ylim(1, 3000); axp.set_xlim(lt0, lt_pad)
         axp.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
-        axp.yaxis.tick_right()
         axp.set_yticks([100, 1000])
         axp.set_yticklabels(["100 W", "1 kW"], fontsize=15)
         axp.axhline(800, color=BREW, linewidth=1, linestyle=":")
