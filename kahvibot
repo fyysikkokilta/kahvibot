@@ -19,6 +19,8 @@ import os
 
 import re
 
+from triggers import DEFAULT_GRAPH_WORDS, graph_words_regex
+
 import logging
 import logging.handlers
 
@@ -79,6 +81,10 @@ coffee_reader_log = getattr(_config, "coffee_reader_log", "")
 camera_lock = getattr(_config, "camera_lock", "")
 # /graph: today's level curve. Off by default (GRAPHS.md §8 step 4).
 coffee_graph_enabled = getattr(_config, "coffee_graph_enabled", False)
+# Words that ask for the graph rather than a photo (triggers.py). They match as
+# prefixes and compound onto the coffee words, so "kahvigraafi" and "graafin"
+# both count; set graph_trigger_words in config.py to override the list.
+graph_trigger_words = getattr(_config, "graph_trigger_words", DEFAULT_GRAPH_WORDS)
 # Reader service (reader/pipeline, reader/PIPELINE.md): the sampler daemon owns the
 # camera and the warm model, and hands the bot its freshest frame plus reading
 # over a local socket. Empty string (the default) = today's behaviour exactly.
@@ -469,7 +475,7 @@ def send_graph(update: Update, ctx: CallbackContext):
     read_coffee_level()'s: any exception degrades to a text reply, because a
     broken graph must never take out the bot.
     """
-    msg = update.message
+    msg = update.effective_message
     if msg is None:
         return
     if not coffee_graph_enabled:
@@ -538,6 +544,16 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("eikiitos", survey.on_eikiitos))
         dispatcher.add_handler(CommandHandler("kahvistatsit", survey.on_stats))
         survey.schedule_jobs(updater.job_queue)
+    # Graph keywords are matched before the photo keywords, because within a
+    # handler group python-telegram-bot runs only the first match: "kahvigraafi"
+    # contains "kahvi" too, and the graph is the more specific request. The
+    # handler is registered only when /graph is enabled, so with the feature off
+    # these words fall through to the photo exactly as they did before.
+    graph_regex = graph_words_regex(graph_trigger_words) if coffee_graph_enabled else None
+    if graph_regex is not None:
+        dispatcher.add_handler(MessageHandler(
+            Filters.text & Filters.regex(graph_regex), send_graph))
+
     trigger_words_regex = re.compile("|".join(trigger_words), re.IGNORECASE)
     dispatcher.add_handler(MessageHandler(Filters.text & Filters.regex(trigger_words_regex), send_webcam_photo))
     dispatcher.add_error_handler(error_callback)

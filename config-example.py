@@ -48,6 +48,21 @@ camera_lock = ""
 # Show /graph (today's coffee level curve). Needs coffee_reader_log data.
 coffee_graph_enabled = False
 
+# Messages containing any of these get the graph instead of a photo. Matched
+# as prefixes and case-insensitively, so Finnish endings need not be listed:
+# "graafi" also catches graafin/graafia, "aikasarja" catches aikasarjan.
+# Only used when coffee_graph_enabled is True. These are checked before
+# trigger_words below, so "kahvigraafi" gives the graph, not a photo.
+# Note "maara"/"amount": someone asking for the amount arguably wants the
+# current reading rather than the day's curve - move those two lines to
+# trigger_words if that turns out to be how people use it.
+graph_trigger_words = [
+    "graafi", "graph", "kuvaaja", "aikasarja", "taikasarja",
+    "timeseries", "time series", "time-series", "trendi",
+    "määrä",
+    "amount", "ammount", "plot", "chart",
+]
+
 # --- Reader service (reader/pipeline, reader/PIPELINE.md) -------------------------
 # When set, the bot asks the resident reader service for its freshest frame and
 # reading instead of running fswebcam + a cold read_frame.py itself, and also
