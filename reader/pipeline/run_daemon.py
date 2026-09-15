@@ -23,6 +23,18 @@ from pipeline.service import ReaderService, ServiceConfig  # noqa: E402
 from pipeline.store import ReadingsStore            # noqa: E402
 
 
+def _read_secret(path: str) -> str:
+    """Read a password from a file. Command lines are world-readable in ps, and
+    this one is in a systemd unit anyone can cat."""
+    if not path:
+        return ""
+    try:
+        return Path(path).read_text(encoding="utf-8").strip()
+    except OSError:
+        logging.getLogger("kahvi").warning("could not read %s; connecting without a password", path)
+        return ""
+
+
 def main(argv=None) -> int:
     here = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description=__doc__)
@@ -48,8 +60,12 @@ def main(argv=None) -> int:
     ap.add_argument("--filter", action="store_true",
                     help="run the (volume, temperature) filter; needs a bundle with line_logits")
     ap.add_argument("--filter-particles", type=int, default=800)
-    ap.add_argument("--power-dir", default="",
-                    help="directory holding the plugs' power_<device>.csv")
+    ap.add_argument("--mqtt-host", default="127.0.0.1")
+    ap.add_argument("--mqtt-port", type=int, default=1883)
+    ap.add_argument("--mqtt-user", default="")
+    ap.add_argument("--mqtt-password-file", default="",
+                    help="file holding the broker password; never pass it on the command line")
+    ap.add_argument("--mqtt-base-topic", default="zigbee2mqtt")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s")
 
@@ -75,8 +91,10 @@ def main(argv=None) -> int:
                         detect_every=a.detect_every, tta_probe_every=a.tta_probe_every,
                         reuse_max_age=a.reuse_max_age,
                         filter_enabled=a.filter, filter_particles=a.filter_particles,
-                        power_dir=a.power_dir,
-                        calibration_path=str(model_dir / "calibration.json"))
+                        calibration_path=str(model_dir / "calibration.json"),
+                        mqtt_host=a.mqtt_host, mqtt_port=a.mqtt_port,
+                        mqtt_user=a.mqtt_user, mqtt_password=_read_secret(a.mqtt_password_file),
+                        mqtt_base_topic=a.mqtt_base_topic)
     gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
                 agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
     svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)

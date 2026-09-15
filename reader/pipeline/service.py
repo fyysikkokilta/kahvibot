@@ -25,7 +25,7 @@ import numpy as np
 from .camera import CaptureBusy, CaptureFailed, Frame
 from .gate import Gate
 from .graphing import DayBuffer, GraphCache
-from .power import PowerTail
+from .power import PowerBus
 from .rbpf import Calibration as RbpfCalibration, PotRBPF
 from .store import ReadingsStore, iso_utc, slim
 
@@ -116,8 +116,13 @@ class ServiceConfig:
     # exporting line_logits, and without one every reading is unchanged.
     filter_enabled: bool = False
     filter_particles: int = 800
-    power_dir: str = ""
     calibration_path: str = ""
+    # plug power over MQTT; the broker already carries it, so nothing reads a file
+    mqtt_host: str = "127.0.0.1"
+    mqtt_port: int = 1883
+    mqtt_user: str = ""
+    mqtt_password: str = ""
+    mqtt_base_topic: str = "zigbee2mqtt"
     power_devices: dict = field(default_factory=lambda: {"left": "vasen", "right": "oikea"})
     full_ml: float = 1250.0
 
@@ -174,9 +179,14 @@ class ReaderService:
                 cal = RbpfCalibration(cfg.calibration_path)
                 self.filters = {s: PotRBPF(cal, n_particles=cfg.filter_particles, seed=i)
                                 for i, s in enumerate(("left", "right"))}
-                self.power = PowerTail(cfg.power_dir, cfg.power_devices, clock=clock)
-                log.info("(volume, temperature) filter on: %d particles/pot, power from %s",
-                         cfg.filter_particles, cfg.power_dir or "(none)")
+                self.power = PowerBus(cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user,
+                                      cfg.mqtt_password, cfg.mqtt_base_topic,
+                                      cfg.power_devices, clock=clock)
+                if not self.power.start():
+                    self.power = None
+                log.info("(volume, temperature) filter on: %d particles/pot, plug power %s",
+                         cfg.filter_particles,
+                         "over mqtt" if self.power is not None else "unavailable")
             except Exception:  # noqa: BLE001 - a missing filter must not stop the reader
                 log.warning("filter unavailable; readings stay unfiltered", exc_info=True)
                 self.filters = {}
