@@ -154,47 +154,52 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
     fig = plt.figure(figsize=(10, 8.0), dpi=100)
     fig.patch.set_facecolor(BG)
     gs = fig.add_gridspec(4, 3, height_ratios=[3.2, 0.95, 3.2, 0.95],
-                          width_ratios=[1.5, 3.3, 3.3], hspace=0.20, wspace=0.10,
-                          left=0.025, right=0.975, top=0.895, bottom=0.055)
+                          width_ratios=[3.2, 3.2, 1.9], hspace=0.20, wspace=0.10,
+                          left=0.068, right=0.978, top=0.895, bottom=0.055)
     fig.text(0.03, 0.965, "Guild room coffee", fontsize=28,
              fontweight="bold", color=DARK, va="top")
     fig.text(0.975, 0.965, now.strftime("last 3 h  ·  %d %b, %H:%M"), ha="right", va="top",
              fontsize=19, color=DIM)
 
+    lt_pad = lt1 + timedelta(minutes=12)          # room to the right of "now"
     for i, side in enumerate(("left", "right")):
         s = series[side]
         t = [loc(x[0]) for x in s]
         med = np.array([x[1] for x in s]); lo = np.array([x[2] for x in s]); hi = np.array([x[3] for x in s])
 
         # big number block
-        axn = fig.add_subplot(gs[2 * i, 0]); axn.axis("off")
-        axn.text(0.0, 0.60, cups_text(med[-1]), fontsize=64, fontweight="bold",
+        axn = fig.add_subplot(gs[2 * i, 2]); axn.axis("off")
+        axn.text(0.10, 0.62, cups_text(med[-1]), fontsize=64, fontweight="bold",
                  color=COL[side], va="center", ha="left")
-        axn.text(0.0, 0.22, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
+        axn.text(0.14 + 0.21 * len(cups_text(med[-1])), 0.50, "cups", fontsize=26,
+                 color=BODY, va="center", ha="left")
+        axn.text(0.10, 0.20, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
                  color=DARK, va="center", ha="left")
-        axn.text(0.0, 0.97, POT_LABEL[side], fontsize=24, fontweight="bold", color=DIM,
+        axn.text(0.10, 0.97, POT_LABEL[side], fontsize=24, fontweight="bold", color=DIM,
                  va="center", ha="left")
 
-        ax = fig.add_subplot(gs[2 * i, 1:]); style(ax, 22)
+        ax = fig.add_subplot(gs[2 * i, 0:2]); style(ax, 22)
         ax.fill_between(t, lo, hi, color=BAND, alpha=0.45, linewidth=0,
                         label="95 % luottamusväli")
         ax.plot(t, med, color=COL[side], linewidth=5.2)
         for a, b in brew_spans(power[side], t0, t1):
             ax.axvspan(a, b, color=BREW, alpha=0.13, zorder=0)
-        ax.set_ylim(0, 1300); ax.set_xlim(lt0, lt1)
+        ax.set_ylim(0, 1300); ax.set_xlim(lt0, lt_pad)
+        ax.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
         ax.set_yticks([0, 250, 500, 750, 1000, 1250])
         ax.set_yticklabels(["0", "2", "4", "6", "8", "10"], fontsize=22)
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         ax.set_xticklabels([])
 
-        axp = fig.add_subplot(gs[2 * i + 1, 1:]); style(axp, 20)
+        axp = fig.add_subplot(gs[2 * i + 1, 0:2]); style(axp, 20)
         pw = [(loc(ts), w) for ts, w in power[side] if t0 <= ts <= t1]
         if pw:
             axp.plot([p[0] for p in pw], [max(p[1], 1.0) for p in pw], color=BODY,
                      linewidth=3.0, drawstyle="steps-post")
         # log scale keeps standby, hotplate and element all visible at once; the
         # axis itself is dropped because the shape is the message, not the watts
-        axp.set_yscale("log"); axp.set_ylim(1, 3000); axp.set_xlim(lt0, lt1)
+        axp.set_yscale("log"); axp.set_ylim(1, 3000); axp.set_xlim(lt0, lt_pad)
+        axp.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
         axp.set_yticks([])
         axp.axhline(800, color=BREW, linewidth=1, linestyle=":")
         for a, b in brew_spans(power[side], t0, t1):
