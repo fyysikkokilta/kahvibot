@@ -20,6 +20,7 @@ import os
 import re
 
 from triggers import DEFAULT_GRAPH_WORDS, graph_words_regex
+import banner as _banner
 
 import logging
 import logging.handlers
@@ -102,6 +103,14 @@ power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oi
 # can still annotate without the bot narrating numbers it is not yet sure of.
 # Error replies are unaffected - a silent failure is worse than a line of text.
 caption_text_enabled = getattr(_config, "caption_text_enabled", False)
+# Reading burned into the bottom corners of the photo, one plate per machine
+# (banner.py). With captions off this is the only place a number appears, and
+# it sits over the machine it describes, so no one has to work out which pot
+# "left" means. Any failure leaves the photo untouched.
+photo_banner_enabled = getattr(_config, "photo_banner_enabled", False)
+photo_banner_names = getattr(_config, "photo_banner_names",
+                             {"left": "EAST", "right": "WEST"})
+photo_banner_font = getattr(_config, "photo_banner_font", "")
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -276,6 +285,9 @@ def _service_reading(hdr: dict) -> dict:
             "h_norm": p.get("h"), "surface_entropy": p.get("e"),
             "detector_score": p.get("d"), "box": p.get("box"),
             "rows_frame_px": p.get("rows"),
+            # present once the service runs the (volume, temperature) filter;
+            # the banner simply omits the line while it is absent
+            "temp_c": p.get("temp_c"),
             "reason": None if usable else "diffuse surface estimate (occluded or no visible surface)",
         })
     return {"pots": pots, "src": "service", "seq": hdr.get("seq"),
@@ -447,6 +459,10 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
             img.paste(bot.watermark_alt, mask=bot.watermark_alt)
         else:
             img.paste(bot.watermark, mask=bot.watermark)
+
+    if photo_banner_enabled:
+        img = _banner.safe_draw(img, reading, logger=logger, names=photo_banner_names,
+                                font_path=photo_banner_font or None)
 
     # img.tobytes() didn't work for some reason, so using BytesIO.
     # see https://stackoverflow.com/a/54165463

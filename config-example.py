@@ -85,6 +85,16 @@ power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
 # and error replies still speak. Set True once the numbers are trusted.
 caption_text_enabled = False
 
+# Burn each machine's reading into the bottom corners of the photo
+# (banner.py). Recommended while caption_text_enabled is False, since it is
+# then the only place a number appears. The plate sits over the machine it
+# describes, so the names are compass points rather than left/right: which
+# pot is 'left' depends on whether you are the camera or a person standing
+# at the machines, and that ambiguity has already caused one wrong mapping.
+photo_banner_enabled = False
+photo_banner_names = {"left": "EAST", "right": "WEST"}
+photo_banner_font = ""      # e.g. a DejaVuSans-Bold.ttf path; blank = autodetect
+
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
 coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @
