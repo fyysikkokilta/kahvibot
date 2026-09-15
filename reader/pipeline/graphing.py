@@ -8,6 +8,7 @@ log file's mtime, which the sampler bumps every flush.
 from __future__ import annotations
 
 import importlib.util
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,11 @@ def load_kahvibot_graphs(path: str | Path):
     sys.modules["kahvibot_graphs"] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+from . import graph_recent  # noqa: E402
+
+log = logging.getLogger("kahvi.graph")
 
 
 class DayBuffer:
@@ -94,16 +100,28 @@ class DayBuffer:
             pots = []
             for p in r["pots"]:
                 tier = gate.tier_pot(p)
-                pots.append({"side": p["s"], "ok": tier != "abstain",
-                             "volume_ml": p["ml"] if tier != "abstain" else None,
-                             "tier": tier})
-            out.append({"_t": datetime.fromisoformat(r["t"]), "pots": pots, "src": r.get("src")})
+                pot = {"side": p["s"], "ok": tier != "abstain",
+                       "volume_ml": p["ml"] if tier != "abstain" else None,
+                       "tier": tier}
+                # the filter's posterior, when the service is running it: the
+                # graph draws the band and the temperature from these
+                for src_key, dst in (("t_c", "temp_c"), ("fm", "f_ml"),
+                                     ("flo", "f_lo"), ("fhi", "f_hi")):
+                    if p.get(src_key) is not None:
+                        pot[dst] = p[src_key]
+                pots.append(pot)
+            when = datetime.fromisoformat(r["t"])
+            out.append({"_t": when, "_wall": when.timestamp(),
+                        "pots": pots, "src": r.get("src")})
         return out
 
 
 class GraphCache:
-    def __init__(self, graphs_mod, gate, ttl_s: float = 600.0, font_dir=None):
+    def __init__(self, graphs_mod, gate, ttl_s: float = 600.0, font_dir=None,
+                 power=None, window_s: float = 3 * 3600.0):
         self.g = graphs_mod
+        self.power = power           # PowerBus, for the strip under each pot
+        self.window_s = float(window_s)
         self.gate = gate
         self.ttl_s = ttl_s
         self.font_dir = font_dir
@@ -132,12 +150,26 @@ class GraphCache:
         if not records:
             png, caption = None, self.g.TEXT_EMPTY
         else:
-            series = self.g.DaySeries(records, now_utc)
-            if not series.enough_for_graph():
-                png, caption = None, self.g._text_not_enough(series.n_readable)
+            png = None
+            try:
+                hist = {}
+                if self.power is not None:
+                    for side in ("left", "right"):
+                        hist[side] = self.power.history(side, now_wall - self.window_s)
+                png = graph_recent.render(records, hist, now_wall,
+                                          window_s=self.window_s, font_dir=self.font_dir)
+            except Exception:  # noqa: BLE001 - fall back rather than lose /graph
+                log.warning("recent graph failed; falling back to the day graph",
+                            exc_info=True)
+            if png is not None:
+                caption = None
             else:
-                png = self.g.render_day_graph(series, font_dir=self.font_dir)
-                caption = self.g.build_caption(series)
+                series = self.g.DaySeries(records, now_utc)
+                if not series.enough_for_graph():
+                    png, caption = None, self.g._text_not_enough(series.n_readable)
+                else:
+                    png = self.g.render_day_graph(series, font_dir=self.font_dir)
+                    caption = self.g.build_caption(series)
         self.render_seconds += time.perf_counter() - t0
         self.renders += 1
         self.key, self.png, self.caption = key, png, caption

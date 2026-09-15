@@ -191,7 +191,10 @@ class ReaderService:
                 log.warning("filter unavailable; readings stay unfiltered", exc_info=True)
                 self.filters = {}
         self.filter_mono = None
-        self.graphcache = GraphCache(graphs_mod, gate, cfg.graph_ttl_s, font_dir) if graphs_mod else None
+        # The recent graph needs no graphs module; the day graph is only a
+        # fallback, so the cache is built either way.
+        self.graphcache = GraphCache(graphs_mod, gate, cfg.graph_ttl_s, font_dir,
+                                     power=self.power)
         self.stats = Stats()
 
     # -- helpers --------------------------------------------------------------
