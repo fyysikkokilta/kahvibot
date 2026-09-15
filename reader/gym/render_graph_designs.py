@@ -153,7 +153,8 @@ def brew_spans(power_rows, t0, t1, threshold=800.0):
 
 
 # --------------------------------------------------------------------------
-def variant_a(series, power, t0, t1, now, lt0, lt1):
+def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
+              fname="A_stacked.png"):
     """Two stacked pot panels, each with its own power strip. Numbers on the left."""
     fig = plt.figure(figsize=(10, 8.0), dpi=100)
     fig.patch.set_facecolor(BG)
@@ -174,16 +175,22 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
 
         # big number block
         axn = fig.add_subplot(gs[2 * i, 2]); axn.axis("off")
-        axn.text(0.10, 0.62, cups_text(med[-1]), fontsize=64, fontweight="bold",
+        axn.text(0.10, 0.54, cups_text(med[-1]), fontsize=64, fontweight="bold",
                  color=COL[side], va="center", ha="left")
-        axn.text(0.14 + 0.21 * len(cups_text(med[-1])), 0.50, "cups", fontsize=26,
+        axn.text(0.14 + 0.21 * len(cups_text(med[-1])), 0.42, "cups", fontsize=26,
                  color=BODY, va="center", ha="left")
-        axn.text(0.10, 0.26, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
+        axn.text(0.10, 0.19, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
                  color=DARK, va="center", ha="left")
-        axn.text(0.10, 0.02, f"{temp[-1]:.0f} \u00b0C", fontsize=27, fontweight="bold",
+        axn.text(0.10, -0.03, f"{temp[-1]:.0f} \u00b0C", fontsize=27, fontweight="bold",
                  color=TEMP, va="center", ha="left")
-        axn.text(0.10, 0.97, POT_LABEL[side], fontsize=24, fontweight="bold", color=DIM,
-                 va="center", ha="left")
+        if show_name:
+            axn.text(0.10, 0.99, POT_LABEL[side], fontsize=24, fontweight="bold",
+                     color=DIM, va="center", ha="left")
+            axn.text(0.10, 0.85, "coffee machine", fontsize=15, color=DIM,
+                     va="center", ha="left")
+        else:
+            axn.text(0.10, 0.92, "coffee machine", fontsize=15, color=DIM,
+                     va="center", ha="left")
 
         ax = fig.add_subplot(gs[2 * i, 0:2]); style(ax, 22)
         ax.fill_between(t, lo, hi, color=BAND, alpha=0.45, linewidth=0,
@@ -224,7 +231,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
         axp.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         if i == 0:
             axp.set_xticklabels([])
-    fig.savefig(OUT / "A_stacked.png", facecolor=BG)
+    fig.savefig(OUT / fname, facecolor=BG)
     plt.close(fig)
 
 
@@ -422,6 +429,8 @@ def main():
               f"[{last[2]:.0f}, {last[3]:.0f}], {last[4]:.0f} C")
     lt0, lt1 = loc(t0), loc(t1)
     variant_a(series, power, t0, t1, now.astimezone(), lt0, lt1)
+    variant_a(series, power, t0, t1, now.astimezone(), lt0, lt1,
+              show_name=False, fname="A_noname.png")
     variant_b(series, power, t0, t1, now.astimezone(), lt0, lt1)
     variant_c(series, power, t0, t1, now.astimezone(), lt0, lt1)
     variant_d(series, power, t0, t1, now.astimezone(), lt0, lt1)
