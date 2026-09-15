@@ -1,6 +1,6 @@
 # Pipeline benchmark — 2026-09-09T22:45
 
-Machine: i7-12700H, 20 threads, onnxruntime CPU, 2 intra-op threads. Archive frames: 10099 (2026-01-12 .. 2026-06-13). Model: C:\Users\Käyttäjä\Documents\projects\lifestyle\coffee\coffee_mesh_pred\_work\onnx.
+Machine: i7-12700H, 20 threads, onnxruntime CPU, 2 intra-op threads. Archive frames: 10099 (2026-01-12 .. 2026-06-13). Model: _work/onnx.
 
 ## 1. Microbenchmarks (this machine, median over 20 frames)
 

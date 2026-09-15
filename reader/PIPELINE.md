@@ -111,18 +111,19 @@ checkpoint sits at 45–50 ml median (n=16). New labels, not new models, move it
 
 ## 3. Deployment
 
+Live on kahviraspi since 2026-09-15.
+
 1. On the Pi, from a checkout of this repo: `bash reader/install_reader.sh`. It
-   copies `read_frame.py`, `pipeline/` and `models/` to `/home/konsta/coffee-reader`
-   (the old sampler's directory, so paths in the unit stay valid), installs
-   `pipeline/kahvi-reader.service`, stops `kahvisampler` and starts `kahvi-reader`.
-   The socket appears at `/run/kahvi-sampler/ipc.sock` (RuntimeDirectoryMode 0775,
-   group konsta; the bot runs as root and needs no ACL).
-2. In the bot's `config.py`: `reader_service_socket = "/run/kahvi-sampler/ipc.sock"`.
-   Restart kahvibot. Without that line the bot behaves exactly as before.
-3. Watch `latest.json` and `journalctl -u kahvi-reader` for a day, then move the
-   gate if the field coverage/error tables in `gym/BENCH_MODELS.md` say so.
-4. Rollback: `systemctl disable --now kahvi-reader && systemctl enable --now kahvisampler`,
-   and drop the config line.
+   builds a virtualenv beside the code, writes the unit with this checkout's
+   paths, stops `kahvisampler` and starts `kahvi-reader`. The reader runs from
+   the checkout; only data (readings, `latest.json`) lives outside it.
+2. In the bot's `config.py`: `reader_service_socket = "/run/kahvi-sampler/ipc.sock"`,
+   and point `coffee_reader_log` at the same data directory. Restart kahvibot.
+   Without that line the bot behaves exactly as before.
+3. Plug power arrives over MQTT; the installer copies the broker password to a
+   file the service user can read. With no broker the filter still runs, it just
+   has to infer brewing instead of being told.
+4. Rollback: `systemctl disable --now kahvi-reader`, drop the config line.
 
 Fix first, independent of all of the above: the power supply (ANALYSIS.md §3).
 

@@ -8,25 +8,41 @@ question entirely.
 
 Drawn with Pillow, which is what kahvibot already uses to composite watermarks,
 so this ports to the bot as-is.
+
+
+Paths come from the environment so this runs anywhere:
+COFFEE_GRAPH_DATA (readings + power CSVs), COFFEE_GRAPH_OUT (where the
+images go), and for the banner COFFEE_GRAPH_FONT.
 """
 import json
 import math
+import os
 import pathlib
 import sys
 from datetime import datetime, timedelta
 
 from PIL import Image, ImageDraw, ImageFont
 
-READER = pathlib.Path(r"C:\Users\Käyttäjä\documents\projects\lifestyle\coffee\kahvibot\reader")
+READER = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(READER))
 import numpy as np  # noqa: E402
 
 from pipeline.rbpf import Calibration, PotRBPF  # noqa: E402
 from pipeline.reader import row_dist  # noqa: E402
 
-S = pathlib.Path(r"C:\Users\KYTTJ~1\AppData\Local\Temp\claude\C--Users-K-ytt-j--documents-projects-lifestyle-coffee\43a96958-cbdd-49cd-8fa3-f6348b29dfd2\scratchpad")
-OUT = pathlib.Path(r"C:\Users\Käyttäjä\documents\projects\lifestyle\coffee\graph_proposals")
-FONT = pathlib.Path(r"C:\Users\Käyttäjä\AppData\Roaming\Python\Python314\site-packages\matplotlib\mpl-data\fonts\ttf\DejaVuSans-Bold.ttf")
+S = pathlib.Path(os.environ.get("COFFEE_GRAPH_DATA", "graph_data"))
+OUT = pathlib.Path(os.environ.get("COFFEE_GRAPH_OUT", "graph_proposals"))
+FONT = pathlib.Path(os.environ.get("COFFEE_GRAPH_FONT", "")) if os.environ.get("COFFEE_GRAPH_FONT") else _find_font()
+
+def _find_font():
+    """A bold sans-serif, wherever this happens to run."""
+    for c in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+              "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+              "C:/Windows/Fonts/arialbd.ttf"):
+        if os.path.exists(c):
+            return pathlib.Path(c)
+    return None
+
 
 COL = {"left": (54, 132, 191), "right": (224, 123, 0)}
 LABEL = {"left": "EAST", "right": "WEST"}

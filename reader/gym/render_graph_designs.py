@@ -9,9 +9,15 @@ sd relation measured on archived frames (37 ml below 0.55, 60 ml to 0.68, 240 ml
 above), because the log keeps entropy but not the frames, so the calibrated
 density head cannot be re-run on them. Once the reader service is deployed the
 band comes straight from the head and this approximation disappears.
+
+
+Paths come from the environment so this runs anywhere:
+COFFEE_GRAPH_DATA (readings + power CSVs), COFFEE_GRAPH_OUT (where the
+images go), and for the banner COFFEE_GRAPH_FONT.
 """
 import json
 import math
+import os
 import pathlib
 import sys
 from datetime import datetime, timedelta, timezone
@@ -23,13 +29,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
-READER = pathlib.Path(r"C:\Users\Käyttäjä\documents\projects\lifestyle\coffee\kahvibot\reader")
+READER = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(READER))
 from pipeline.rbpf import Calibration, PotRBPF  # noqa: E402
 from pipeline.reader import row_dist  # noqa: E402
 
-S = pathlib.Path(r"C:\Users\KYTTJ~1\AppData\Local\Temp\claude\C--Users-K-ytt-j--documents-projects-lifestyle-coffee\43a96958-cbdd-49cd-8fa3-f6348b29dfd2\scratchpad")
-OUT = pathlib.Path(r"C:\Users\Käyttäjä\documents\projects\lifestyle\coffee\graph_proposals")
+S = pathlib.Path(os.environ.get("COFFEE_GRAPH_DATA", "graph_data"))
+OUT = pathlib.Path(os.environ.get("COFFEE_GRAPH_OUT", "graph_proposals"))
 OUT.mkdir(exist_ok=True)
 
 # kahvibot palette (graphs.py §5.5)
