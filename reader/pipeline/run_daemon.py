@@ -80,7 +80,10 @@ def main(argv=None) -> int:
     clock = RealClock()
     camera = FswebcamCamera(clock, lock_path=a.lock, tmp_path=str(run_dir / "frame.jpg"))
     reader = WarmReader(model_dir, threads=a.threads)
-    store = ReadingsStore(log_pattern, clock, latest_path=str(model_dir / "latest.json"))
+    # latest.json belongs beside the readings, not inside the model bundle: the
+    # bundle is a checkout of the repository and must stay clean.
+    store = ReadingsStore(log_pattern, clock,
+                          latest_path=str(Path(log_pattern).parent / "latest.json"))
     graphs_mod = None
     if a.graphs and Path(a.graphs).is_file():
         try:
