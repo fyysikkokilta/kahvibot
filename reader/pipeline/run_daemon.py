@@ -45,6 +45,11 @@ def main(argv=None) -> int:
     ap.add_argument("--agree-ok-ml", type=float, default=40.0)
     ap.add_argument("--agree-uncertain-ml", type=float, default=90.0)
     ap.add_argument("--threads", type=int, default=2)
+    ap.add_argument("--filter", action="store_true",
+                    help="run the (volume, temperature) filter; needs a bundle with line_logits")
+    ap.add_argument("--filter-particles", type=int, default=800)
+    ap.add_argument("--power-dir", default="",
+                    help="directory holding the plugs' power_<device>.csv")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s")
 
@@ -68,7 +73,10 @@ def main(argv=None) -> int:
             logging.getLogger("kahvi").warning("graphs module unavailable", exc_info=True)
     cfg = ServiceConfig(interval=a.interval, dark_interval=a.dark_interval,
                         detect_every=a.detect_every, tta_probe_every=a.tta_probe_every,
-                        reuse_max_age=a.reuse_max_age)
+                        reuse_max_age=a.reuse_max_age,
+                        filter_enabled=a.filter, filter_particles=a.filter_particles,
+                        power_dir=a.power_dir,
+                        calibration_path=str(model_dir / "calibration.json"))
     gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
                 agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
     svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)

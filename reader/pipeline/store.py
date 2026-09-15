@@ -31,6 +31,10 @@ def slim(pots):
             rec["v"] = p["v"]
         if p.get("agree") is not None:
             rec["a"] = p["agree"]           # ml of disagreement with the previous reading
+        # filter output, present only when the service runs the filter
+        for src_key, dst in (("temp_c", "t_c"), ("f_ml", "fm"), ("f_lo", "flo"), ("f_hi", "fhi")):
+            if p.get(src_key) is not None:
+                rec[dst] = p[src_key]
         out.append(rec)
     return out
 

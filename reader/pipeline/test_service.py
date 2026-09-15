@@ -49,7 +49,7 @@ class FakeReader:
         return [{"side": "left", "box": [0, 0, 30, 40], "score": 0.9},
                 {"side": "right", "box": [34, 0, 64, 40], "score": 0.9}], 0.05
 
-    def read_pots(self, rgb, dets, tta=1, ident=None):
+    def read_pots(self, rgb, dets, tta=1, ident=None, **kw):
         self.calls += 1
         return [{"side": d["side"], "h": 0.3, "e": self.e, "d": d["score"], "ml": 375.0,
                  "fill": 0.3, "box": d["box"], "rows": {"base": 40, "top": 0, "surf": 28}} for d in dets], 0.1

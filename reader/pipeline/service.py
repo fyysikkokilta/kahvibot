@@ -25,6 +25,8 @@ import numpy as np
 from .camera import CaptureBusy, CaptureFailed, Frame
 from .gate import Gate
 from .graphing import DayBuffer, GraphCache
+from .power import PowerTail
+from .rbpf import Calibration as RbpfCalibration, PotRBPF
 from .store import ReadingsStore, iso_utc, slim
 
 log = logging.getLogger("kahvi.service")
@@ -110,6 +112,13 @@ class ServiceConfig:
     flush_sec: float = 60.0
     graph_ttl_s: float = 600.0
     agree_window_s: float = 60.0      # a previous reading this recent defines 'agreement'
+    # (volume, temperature) filter. Off by default: it needs a model bundle
+    # exporting line_logits, and without one every reading is unchanged.
+    filter_enabled: bool = False
+    filter_particles: int = 800
+    power_dir: str = ""
+    calibration_path: str = ""
+    power_devices: dict = field(default_factory=lambda: {"left": "vasen", "right": "oikea"})
     full_ml: float = 1250.0
 
 
@@ -155,6 +164,23 @@ class ReaderService:
         self.last_lit_tick_mono: Optional[float] = None
         self.next_tick_mono = clock.mono()
         self.daybuf = DayBuffer()
+        # One filter per pot. Volume is sampled because its observation is
+        # multimodal; temperature rides along in a Kalman filter inside each
+        # particle, because it has no sensor and sampling it would waste them.
+        self.filters = {}
+        self.power = None
+        if cfg.filter_enabled:
+            try:
+                cal = RbpfCalibration(cfg.calibration_path)
+                self.filters = {s: PotRBPF(cal, n_particles=cfg.filter_particles, seed=i)
+                                for i, s in enumerate(("left", "right"))}
+                self.power = PowerTail(cfg.power_dir, cfg.power_devices, clock=clock)
+                log.info("(volume, temperature) filter on: %d particles/pot, power from %s",
+                         cfg.filter_particles, cfg.power_dir or "(none)")
+            except Exception:  # noqa: BLE001 - a missing filter must not stop the reader
+                log.warning("filter unavailable; readings stay unfiltered", exc_info=True)
+                self.filters = {}
+        self.filter_mono = None
         self.graphcache = GraphCache(graphs_mod, gate, cfg.graph_ttl_s, font_dir) if graphs_mod else None
         self.stats = Stats()
 
@@ -205,7 +231,8 @@ class ReaderService:
                 if self.consec_nodetect >= 3:
                     self.boxcache.clear()
         dets = self.boxcache.working()
-        pots, dt = self.reader.read_pots(rgb, dets, tta, ident=frame.ident) if dets else ([], 0.0)
+        pots, dt = self.reader.read_pots(rgb, dets, tta, ident=frame.ident,
+                                         with_rows=bool(self.filters)) if dets else ([], 0.0)
         self._charge(dt)
         self.reading_n += 1
         # temporal agreement with the previous reading of the same pot (gate.py)
@@ -224,6 +251,7 @@ class ReaderService:
                 if prev is not None and abs(p["ml"] - prev) > self.cfg.jump_ml:
                     self.force_detect = True
                 self.last_ml[p["side"]] = p["ml"]
+        self._step_filters(pots, now)
         # DELTA: blind = no carafe detected for a long time, not "no ok reading"
         if not dets:
             if self.consec_nodetect >= self.cfg.blind_after_nodetect and not self.blind:
@@ -234,6 +262,38 @@ class ReaderService:
             self.blind = False
             log.info("carafe detected again; cadence %.0f s", self.cfg.interval)
         return pots
+
+    def _step_filters(self, pots, now_mono: float) -> None:
+        """Advance each pot's filter and hang its posterior on the reading.
+
+        The row distribution enters as a likelihood, so a diffuse frame widens
+        the posterior instead of being discarded, and the plug's wattage pins the
+        regime: the level may only rise while the element is drawing. Failure
+        here is never fatal - the unfiltered reading is still a reading.
+        """
+        if not self.filters:
+            return
+        dt = 0.0 if self.filter_mono is None else max(now_mono - self.filter_mono, 0.0)
+        self.filter_mono = now_mono
+        seen = {p["side"] for p in pots}
+        for side, filt in self.filters.items():
+            try:
+                pot = next((p for p in pots if p["side"] == side), None)
+                watts = self.power.watts(side) if self.power is not None else None
+                post = filt.step(dt=min(dt, 300.0), power_w=watts,
+                                 rowdist=(pot or {}).get("rowdist"),
+                                 surface_logit=(pot or {}).get("v"))
+                if pot is not None:
+                    pot["temp_c"] = round(post.temp_mean, 1)
+                    pot["f_ml"] = round(post.ml_median, 1)
+                    pot["f_lo"] = round(post.ml_lo, 1)
+                    pot["f_hi"] = round(post.ml_hi, 1)
+                    pot["brewing"] = bool(post.brewing)
+            except Exception:  # noqa: BLE001
+                log.warning("filter step failed for %s", side, exc_info=True)
+        for p in pots:
+            p.pop("rowdist", None)          # never goes in the log: 3x256 floats per pot
+        _ = seen
 
     def _record(self, frame: Frame, luma: float, pots, src: str, tta: int) -> dict:
         rec = {"t": iso_utc(frame.captured_wall), "seq": self.seq, "src": src,
