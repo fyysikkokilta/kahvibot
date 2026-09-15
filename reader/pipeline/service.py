@@ -323,6 +323,7 @@ class ReaderService:
 
     def tick(self) -> None:
         self.stats.ticks += 1
+        self.warm_graph()
         fr = self._capture()
         if fr is None:
             return
@@ -439,6 +440,22 @@ class ReaderService:
         self.stats.request_photo_latency.append(photo_ready - t_req)
         self.stats.request_reading_latency.append(self.clock.mono() - t_req)
         return FrameResult(fr, pots, 0.0, False, seq)
+
+    def warm_graph(self) -> None:
+        """Render the graph on the loop thread if it is due.
+
+        A /graph request is a queued request, so it waits for whatever tick is
+        running and then for the render itself - together well past the bot's
+        socket timeout, which is why the first live request came back empty.
+        Rendering here costs the loop a second every TTL and turns every request
+        into a cache hit that the socket thread can answer immediately.
+        """
+        if self.graphcache is None:
+            return
+        try:
+            self.graphcache.get(self.daybuf, self.store.latest["last_usable_seq"], self.clock)
+        except Exception:  # noqa: BLE001 - a graph must never stop the sampler
+            log.warning("graph warm failed", exc_info=True)
 
     def graph(self):
         if self.graphcache is None:

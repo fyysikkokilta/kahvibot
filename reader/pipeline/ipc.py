@@ -144,7 +144,18 @@ class IPCServer(threading.Thread):
         through the queue as before. Returns (header, body) or None.
         """
         svc = self.service
-        if svc is None or payload.get("op") != "frame":
+        if svc is None:
+            return None
+        if payload.get("op") == "graph":
+            # A warm cache is just bytes; serving it here keeps /graph off the
+            # queue, where it would wait for a tick and then for a render.
+            cache = getattr(svc, "graphcache", None)
+            png = getattr(cache, "png", None) if cache is not None else None
+            if png:
+                cache.hits += 1
+                return {"ok": True, "caption": cache.caption, "fast": True}, png
+            return None
+        if payload.get("op") != "frame":
             return None
         try:
             lit = svc.last_lit                      # one atomic attribute read
