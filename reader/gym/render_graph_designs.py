@@ -39,7 +39,7 @@ DARK, BODY, DIM, FOOT = "#1a1a1a", "#2b2b2b", "#5a5a5a", "#6a6a6a"
 COL = {"left": "#1f77b4", "right": "#e07b00"}
 BREW = "#2ca02c"
 BAND = "#b9b3ab"
-FI = {"left": "VASEN", "right": "OIKEA"}
+POT_LABEL = {"left": "LEFT", "right": "RIGHT"}
 CUP_ML = 125.0
 HOURS = 3.0
 ROWS, Y_BASE, Y_TOP = 256, 0.88, 0.12
@@ -156,9 +156,9 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
     gs = fig.add_gridspec(4, 3, height_ratios=[3.2, 0.95, 3.2, 0.95],
                           width_ratios=[1.5, 3.3, 3.3], hspace=0.20, wspace=0.10,
                           left=0.025, right=0.975, top=0.895, bottom=0.055)
-    fig.text(0.03, 0.965, "Kiltiksen kahvi", fontsize=28,
+    fig.text(0.03, 0.965, "Guild room coffee", fontsize=28,
              fontweight="bold", color=DARK, va="top")
-    fig.text(0.975, 0.965, now.strftime("3 h  ·  %d.%m. klo %H:%M"), ha="right", va="top",
+    fig.text(0.975, 0.965, now.strftime("last 3 h  ·  %d %b, %H:%M"), ha="right", va="top",
              fontsize=19, color=DIM)
 
     for i, side in enumerate(("left", "right")):
@@ -172,7 +172,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1):
                  color=COL[side], va="center", ha="left")
         axn.text(0.0, 0.22, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
                  color=DARK, va="center", ha="left")
-        axn.text(0.0, 0.97, FI[side], fontsize=24, fontweight="bold", color=DIM,
+        axn.text(0.0, 0.97, POT_LABEL[side], fontsize=24, fontweight="bold", color=DIM,
                  va="center", ha="left")
 
         ax = fig.add_subplot(gs[2 * i, 1:]); style(ax, 22)
@@ -223,7 +223,7 @@ def variant_b(series, power, t0, t1, now, lt0, lt1):
         med = np.array([x[1] for x in s]); lo = np.array([x[2] for x in s]); hi = np.array([x[3] for x in s])
 
         axn = fig.add_subplot(gs[0, i]); axn.axis("off")
-        axn.text(0.5, 1.02, FI[side], fontsize=15, fontweight="bold", color=DIM,
+        axn.text(0.5, 1.02, POT_LABEL[side], fontsize=15, fontweight="bold", color=DIM,
                  ha="center", va="top")
         axn.text(0.5, 0.44, cups_text(med[-1]), fontsize=72, fontweight="bold",
                  color=COL[side], ha="center", va="center")
@@ -283,7 +283,7 @@ def variant_c(series, power, t0, t1, now, lt0, lt1):
         ax.set_xlim(0, 1); ax.set_ylim(0, 1)
         ax.add_patch(Rectangle((0, 0), 1, 1, facecolor="white", edgecolor=FRAME,
                                linewidth=1.1, transform=ax.transAxes, zorder=0))
-        ax.text(0.022, 0.80, FI[side], fontsize=15, fontweight="bold", color=DIM, va="center")
+        ax.text(0.022, 0.80, POT_LABEL[side], fontsize=15, fontweight="bold", color=DIM, va="center")
         ax.text(0.030, 0.40, cups_text(med[-1]), fontsize=58, fontweight="bold",
                 color=COL[side], va="center")
         ax.text(0.215, 0.52, "kuppia", fontsize=16, color=BODY, va="center")
