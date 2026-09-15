@@ -132,6 +132,25 @@ def style(ax, labelsize=11):
     ax.grid(True, which="minor", color=GRID_MINOR, linewidth=0.6)
 
 
+def ml_block(ax, x, y, ml, colour):
+    """Draw "<n> ml" as large as will fit the column, measured rather than guessed.
+
+    Two earlier attempts estimated the width from a character count and both
+    clipped: the bold numerals are wider than any constant I picked. Asking the
+    renderer how wide the text actually is costs nothing and cannot be wrong.
+    """
+    txt = f"{ml:.0f} ml"
+    renderer = ax.figure.canvas.get_renderer()
+    avail = ax.get_window_extent(renderer=renderer).width * (1.0 - x) * 0.96
+    size = 60
+    t = ax.text(x, y, txt, fontsize=size, fontweight="bold", color=colour,
+                va="center", ha="left")
+    while size > 18 and t.get_window_extent(renderer=renderer).width > avail:
+        size -= 2
+        t.set_fontsize(size)
+    return t
+
+
 def cups_text(ml):
     """Whole cups. No fractions: a half-cup glyph is wide, collides with the
     label beside it, and is a precision the reader cannot honestly claim."""
@@ -160,7 +179,7 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
     fig.patch.set_facecolor(BG)
     gs = fig.add_gridspec(4, 3, height_ratios=[3.2, 0.95, 3.2, 0.95],
                           width_ratios=[3.2, 3.2, 1.75], hspace=0.20, wspace=0.26,
-                          left=0.068, right=0.978, top=0.895, bottom=0.055)
+                          left=0.105, right=0.978, top=0.895, bottom=0.055)
     fig.text(0.03, 0.965, "Guild room coffee", fontsize=28,
              fontweight="bold", color=DARK, va="top")
     fig.text(0.975, 0.965, now.strftime("last 3 h  ·  %d %b, %H:%M"), ha="right", va="top",
@@ -175,13 +194,8 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
 
         # big number block
         axn = fig.add_subplot(gs[2 * i, 2]); axn.axis("off")
-        axn.text(0.10, 0.54, cups_text(med[-1]), fontsize=64, fontweight="bold",
-                 color=COL[side], va="center", ha="left")
-        axn.text(0.14 + 0.21 * len(cups_text(med[-1])), 0.42, "cups", fontsize=26,
-                 color=BODY, va="center", ha="left")
-        axn.text(0.10, 0.19, f"{med[-1]:.0f} ml", fontsize=32, fontweight="bold",
-                 color=DARK, va="center", ha="left")
-        axn.text(0.10, -0.03, f"{temp[-1]:.0f} \u00b0C", fontsize=27, fontweight="bold",
+        ml_block(axn, 0.10, 0.48, med[-1], COL[side])
+        axn.text(0.10, 0.12, f"{temp[-1]:.0f} \u00b0C", fontsize=30, fontweight="bold",
                  color=TEMP, va="center", ha="left")
         if show_name:
             axn.text(0.10, 0.99, POT_LABEL[side], fontsize=24, fontweight="bold",
@@ -201,7 +215,8 @@ def variant_a(series, power, t0, t1, now, lt0, lt1, show_name=True,
         ax.set_ylim(0, 1300); ax.set_xlim(lt0, lt_pad)
         ax.axvline(lt1, color="#d62728", linewidth=2.4, linestyle=(0, (5, 4)), zorder=5)
         ax.set_yticks([0, 250, 500, 750, 1000, 1250])
-        ax.set_yticklabels(["0", "2", "4", "6", "8", "10"], fontsize=22)
+        ax.set_yticklabels(["0", "250", "500", "750", "1000", "1250"], fontsize=19)
+        ax.set_ylabel("ml", color=BODY, fontsize=19)
         axt = ax.twinx()
         axt.plot(t, temp, color=TEMP, linewidth=2.4, linestyle=(0, (6, 3)), zorder=4)
         axt.set_ylim(0, 100); axt.set_xlim(lt0, lt_pad)
@@ -279,19 +294,14 @@ def variant_d(series, power, t0, t1, now, lt0, lt1):
         y = 0.94 - i * 0.50
         axn.text(0.10, y, POT_LABEL[side], fontsize=24, fontweight="bold", color=COL[side],
                  va="center", ha="left")
-        axn.text(0.10, y - 0.15, cups_text(med[-1]), fontsize=60, fontweight="bold",
-                 color=COL[side], va="center", ha="left")
-        axn.text(0.14 + 0.20 * len(cups_text(med[-1])), y - 0.19, "cups", fontsize=24,
-                 color=BODY, va="center", ha="left")
-        axn.text(0.10, y - 0.29, f"{med[-1]:.0f} ml", fontsize=29, fontweight="bold",
-                 color=DARK, va="center", ha="left")
-        axn.text(0.10, y - 0.38, f"{temp[-1]:.0f} \u00b0C", fontsize=25, fontweight="bold",
+        ml_block(axn, 0.10, y - 0.17, med[-1], COL[side])
+        axn.text(0.10, y - 0.33, f"{temp[-1]:.0f} \u00b0C", fontsize=27, fontweight="bold",
                  color=TEMP, va="center", ha="left")
 
     axl.set_ylim(0, 1300); axl.set_xlim(lt0, lt_pad)
     axl.set_yticks([0, 250, 500, 750, 1000, 1250])
-    axl.set_yticklabels(["0", "2", "4", "6", "8", "10"], fontsize=22)
-    axl.set_ylabel("cups", color=BODY, fontsize=19)
+    axl.set_yticklabels(["0", "250", "500", "750", "1000", "1250"], fontsize=19)
+    axl.set_ylabel("ml", color=BODY, fontsize=19)
     axl.set_xticklabels([]); nowline(axl)
 
     axt.set_ylim(0, 100); axt.set_xlim(lt0, lt_pad)
