@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""Telegram escalation for a kahvi-reader lock the watchdog cannot clear.
+
+The watchdog (notify.py) handles the recoverable case: a loop that stops
+completing ticks is killed and restarted in ~2 min. This is for the cases where
+that fails, which are the ones worth interrupting a human for:
+
+  1. systemd gave up       -- Restart=always exhausted StartLimitBurst and the
+                              unit sits in `failed`. Restarting did not fix it.
+  2. the kill did not land -- a task in uninterruptible sleep (D) ignores
+                              SIGABRT and SIGKILL, so the unit hangs in
+                              stop-sigkill and never reaches `failed`. This is
+                              the hardest lock: systemd itself is stuck, so
+                              OnFailure= never fires and only a poll finds it.
+  3. alive but silent      -- the unit is `active`, the watchdog has not fired,
+                              and yet no reading has been written for far longer
+                              than any legitimate cadence.
+  4. flapping              -- restarting repeatedly without ever settling.
+
+Case 1 arrives through OnFailure=; 2-4 through a 5-minute timer, because a
+wedged systemd job emits no events to hook onto.
+
+The bot token is read from the bot's own config at runtime and is never copied
+into this script, the unit files, or the alert state.
+
+  kahvi-alert onfailure <unit>   # OnFailure= handler
+  kahvi-alert check              # timer
+  kahvi-alert test               # send a test message and exit
+"""
+from __future__ import annotations
+
+import ast
+import json
+import subprocess
+import sys
+import time
+import urllib.parse
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+CONF = Path("/etc/kahvi-alert.conf")
+STATE = Path("/var/lib/kahvi-alert")
+UNIT = "kahvi-reader.service"
+COOLDOWN_S = 30 * 60           # never repeat the same kind inside this window
+STUCK_AFTER_S = 5 * 60         # how long a D / stop-sigkill state must persist
+STALE_AFTER_S = 20 * 60        # readings silence that means "not producing"
+FLAP_RESTARTS = 3              # restarts within an hour that count as flapping
+
+FAILED_HEAD = "\U0001F534 kahviraspi: kahvi-reader FAILED and stayed down"
+FAILED_BODY = ("systemd stopped restarting it -- StartLimitBurst exhausted, so the "
+               "watchdog restart did not fix the problem. The bot has fallen back to "
+               "fswebcam, so coffee still works, slowly.\n\n")
+
+
+def conf() -> dict:
+    out = {}
+    try:
+        for line in CONF.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, _, v = line.partition("=")
+                out[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return out
+
+
+def bot_token(cfg: dict) -> str:
+    """Pull bot_token out of the bot's config.py without executing it."""
+    path = cfg.get("CONFIG_PY", "/home/marci/dev/kiltiskahvi/config.py")
+    try:
+        tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return ""
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name) and t.id == "bot_token":
+                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                        return node.value.value
+    return ""
+
+
+def sh(*cmd) -> str:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def show(unit: str, *props) -> dict:
+    out = sh("systemctl", "show", unit, *["-p" + p for p in props])
+    d = {}
+    for line in out.splitlines():
+        k, _, v = line.partition("=")
+        d[k] = v
+    return d
+
+
+def pid_state(pid: str) -> str:
+    try:
+        for line in Path("/proc/%s/status" % pid).read_text().splitlines():
+            if line.startswith("State:"):
+                return line.split()[1]
+    except OSError:
+        pass
+    return "?"
+
+
+def readings_age(cfg: dict):
+    pat = cfg.get("READINGS", "/home/konsta/coffee-data/readings-%Y-%m.jsonl")
+    p = Path(datetime.now().strftime(pat))
+    try:
+        return time.time() - p.stat().st_mtime, p
+    except OSError:
+        return None, p
+
+
+# -- state (dedupe, and how long a condition has held) ------------------------
+
+def state_get(name: str):
+    try:
+        return json.loads((STATE / name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def state_put(name: str, data: dict) -> None:
+    try:
+        STATE.mkdir(parents=True, exist_ok=True)
+        (STATE / name).write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def held_for(key: str, active: bool) -> float:
+    """Seconds this condition has held; 0 when it is not currently true."""
+    st = state_get("conditions")
+    now = time.time()
+    if not active:
+        if key in st:
+            st.pop(key, None)
+            state_put("conditions", st)
+        return 0.0
+    if key not in st:
+        st[key] = now
+        state_put("conditions", st)
+    return now - st.get(key, now)
+
+
+# -- telegram -----------------------------------------------------------------
+
+def send(text: str) -> bool:
+    cfg = conf()
+    chat = cfg.get("CHAT_ID", "").strip()
+    if not chat or chat == "0":
+        print("kahvi-alert: no CHAT_ID in %s; not sending" % CONF, file=sys.stderr)
+        return False
+    token = bot_token(cfg)
+    if not token:
+        print("kahvi-alert: could not read bot_token", file=sys.stderr)
+        return False
+    data = urllib.parse.urlencode({
+        "chat_id": chat,
+        "text": text[:3900],
+        "disable_web_page_preview": "true",
+    }).encode()
+    url = "https://api.telegram.org/bot%s/sendMessage" % token
+    try:
+        with urllib.request.urlopen(url, data=data, timeout=20) as r:
+            ok = json.loads(r.read().decode()).get("ok", False)
+            if not ok:
+                print("kahvi-alert: telegram refused the message", file=sys.stderr)
+            return bool(ok)
+    except Exception as e:                                  # noqa: BLE001
+        # Never print the URL or the exception text: both can carry the token.
+        print("kahvi-alert: send failed: %s" % type(e).__name__, file=sys.stderr)
+        return False
+
+
+def notify(kind: str, headline: str, detail: str) -> None:
+    """Send, unless the same kind already went out inside the cooldown."""
+    sent = state_get("sent")
+    now = time.time()
+    last = sent.get(kind, 0)
+    if now - last < COOLDOWN_S:
+        print("kahvi-alert: %s still in cooldown (%.0f min left)"
+              % (kind, (COOLDOWN_S - (now - last)) / 60), file=sys.stderr)
+        return
+    if send(headline + "\n\n" + detail):
+        sent[kind] = now
+        state_put("sent", sent)
+        print("kahvi-alert: sent %s" % kind, file=sys.stderr)
+
+
+def context(cfg: dict) -> str:
+    d = show(UNIT, "ActiveState", "SubState", "Result", "NRestarts", "MainPID",
+             "ExecMainStartTimestamp")
+    pid = d.get("MainPID", "0")
+    age, path = readings_age(cfg)
+    lines = [
+        "unit:      %s (%s), result=%s" % (d.get("ActiveState"), d.get("SubState"),
+                                           d.get("Result")),
+        "restarts:  %s" % d.get("NRestarts"),
+        "main pid:  %s state=%s" % (pid, pid_state(pid) if pid not in ("", "0") else "-"),
+        "since:     %s" % d.get("ExecMainStartTimestamp", "-"),
+        "readings:  %s" % ("%.0f min stale" % (age / 60) if age is not None
+                           else "missing (%s)" % path),
+        "throttled: %s" % (sh("vcgencmd", "get_throttled") or "-"),
+        "uptime:    %s" % sh("uptime", "-p"),
+        "",
+        "last journal lines:",
+    ]
+    jr = sh("journalctl", "-u", UNIT, "-n", "8", "--no-pager", "-o", "short")
+    lines += ["  " + l for l in jr.splitlines()[-8:]]
+    lines += ["", "then: systemctl status %s" % UNIT]
+    return "\n".join(lines)
+
+
+# -- the checks ---------------------------------------------------------------
+
+def do_check() -> int:
+    cfg = conf()
+    d = show(UNIT, "ActiveState", "SubState", "NRestarts", "MainPID")
+    active, sub = d.get("ActiveState", ""), d.get("SubState", "")
+    pid = d.get("MainPID", "0")
+    pstate = pid_state(pid) if pid not in ("", "0") else "-"
+    age, _ = readings_age(cfg)
+
+    # 2. the kill did not land: systemd stuck mid-stop, or the process in D
+    stuck = sub in ("stop-sigkill", "final-sigkill", "stop-sigterm") or pstate == "D"
+    t = held_for("stuck_kill", stuck)
+    if stuck and t > STUCK_AFTER_S:
+        notify("stuck_kill",
+               "\U0001F534 kahviraspi: kahvi-reader is UNKILLABLE",
+               ("systemd has been trying to stop it for %.0f min and the process will not "
+                "die (sub=%s, pid state=%s). SIGKILL does not land on a task in "
+                "uninterruptible sleep -- this usually means the USB camera wedged inside "
+                "the driver. A reboot is the normal fix.\n\n" % (t / 60, sub, pstate))
+               + context(cfg))
+        return 0
+
+    # 1. systemd gave up (also caught here if the OnFailure= handler missed it)
+    if active == "failed":
+        notify("failed", FAILED_HEAD, FAILED_BODY + context(cfg))
+        return 0
+
+    # 3. alive but producing nothing
+    silent = (active == "active" and age is not None and age > STALE_AFTER_S)
+    t = held_for("silent", silent)
+    if silent and t > STUCK_AFTER_S:
+        notify("silent",
+               "\U0001F7E0 kahviraspi: kahvi-reader is up but writing nothing",
+               ("The unit is active and the watchdog has not fired, yet no reading has "
+                "been written for %.0f min. Either the ping is being sent when it should "
+                "not be, or captures are failing continuously.\n\n" % (age / 60))
+               + context(cfg))
+        return 0
+
+    # 4. flapping: restarting repeatedly without settling
+    try:
+        n = int(d.get("NRestarts", "0") or 0)
+    except ValueError:
+        n = 0
+    flap = state_get("flap")
+    now = time.time()
+    if not flap or now - flap.get("t", 0) > 3600:
+        state_put("flap", {"t": now, "n": n})
+    elif n - flap.get("n", n) >= FLAP_RESTARTS:
+        notify("flap",
+               "\U0001F7E1 kahviraspi: kahvi-reader is flapping",
+               ("%d watchdog restarts in the last hour. It recovers each time, so this is "
+                "not urgent, but the spin underneath is still there.\n\n"
+                % (n - flap.get("n", n))) + context(cfg))
+        state_put("flap", {"t": now, "n": n})
+        return 0
+
+    # healthy: clear the alarms, and say so once if any were standing
+    sent = state_get("sent")
+    if sent:
+        cleared = ", ".join(sorted(sent))
+        state_put("sent", {})
+        send("\U0001F7E2 kahviraspi: kahvi-reader is healthy again (was: %s)\n\n%s"
+             % (cleared, context(cfg)))
+    return 0
+
+
+def main(argv) -> int:
+    mode = argv[1] if len(argv) > 1 else "check"
+    if mode == "test":
+        ok = send("\U0001F7E2 kahviraspi: kahvi-alert test message.\n\n" + context(conf()))
+        print("sent" if ok else "NOT sent - check CHAT_ID in %s" % CONF)
+        return 0 if ok else 1
+    if mode == "onfailure":
+        notify("failed", FAILED_HEAD, FAILED_BODY + context(conf()))
+        return 0
+    return do_check()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

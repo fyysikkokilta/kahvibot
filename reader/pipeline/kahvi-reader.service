@@ -1,0 +1,69 @@
+# Coffee level reader: one process owns the camera and the model, serves the bot
+# over a local socket, and runs the (volume, temperature) filter.
+#
+# Code and the model bundle live inside the kahvibot checkout; only data lives
+# outside it, so the checkout stays clean and `git status` stays meaningful.
+# Install with reader/install_reader.sh, which fills in the paths below.
+#
+# Replaces kahvisampler.service. Choices here trace to measurements:
+#   * CPUQuota 60 %: the old 25 % quota turned a 10 s sampler into a 33 s one.
+#   * reuse-max-age 30 s: ticks land ~20 s apart on this Pi, so a 15 s window
+#     sent most bot requests down the slow path.
+#   * gate agree: entropy carries no accuracy signal (reader/gym/GATE3_v8.md).
+#   * MemoryMax 320M: the Pi has 909 MB and also runs the bot and zigbee2mqtt.
+
+[Unit]
+Description=Coffee level reader service (camera + model + IPC)
+After=time-sync.target network-online.target mosquitto.service
+Wants=time-sync.target mosquitto.service
+# When the burst below is exhausted the unit lands in `failed` and stays
+# there: restarting has demonstrably not fixed it, which is the one case
+# worth a Telegram message rather than another retry.
+OnFailure=kahvi-alert@%n.service
+StartLimitIntervalSec=1h
+StartLimitBurst=5
+
+[Service]
+# notify, not simple: the daemon pings WATCHDOG=1 only while its loop is
+# still completing ticks, so a spin that leaves the process alive but
+# useless (2026-09-15, 21 h) becomes a restart in ~2 min. Restart=always
+# alone cannot catch that case, because the process never exits.
+# Turns the watchdog's SIGABRT into a full Python traceback in the journal.
+# Without it a watchdog kill says only that the loop stopped; with it, the
+# dump named the spinning frame directly (2026-09-16).
+Environment=PYTHONFAULTHANDLER=1
+Type=notify
+NotifyAccess=main
+WatchdogSec=120
+User=konsta
+Group=konsta
+SupplementaryGroups=video
+WorkingDirectory=/home/marci/dev/kiltiskahvi/reader
+ExecStart=/home/marci/dev/kiltiskahvi/reader/venv/bin/python \
+    /home/marci/dev/kiltiskahvi/reader/pipeline/run_daemon.py \
+    --model-dir /home/marci/dev/kiltiskahvi/reader/models \
+    --log /home/konsta/coffee-data/readings-%%Y-%%m.jsonl \
+    --graphs /home/marci/dev/kiltiskahvi/graphs.py \
+    --interval 10 --reuse-max-age 30 \
+    --filter --mqtt-user zigbee2mqtt --mqtt-password-file /home/konsta/mqtt.pw \
+    --gate-mode agree --agree-ok-ml 40 --agree-uncertain-ml 90 \
+    --gate-ok 0.62 --gate-uncertain 0.68
+RuntimeDirectory=kahvi-sampler
+RuntimeDirectoryMode=0775
+StateDirectory=kahvi-sampler
+
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+CPUQuota=60%
+MemoryHigh=240M
+MemoryMax=320M
+OOMScoreAdjust=500
+
+Restart=always
+RestartSec=30
+LogRateLimitIntervalSec=60
+LogRateLimitBurst=20
+
+[Install]
+WantedBy=multi-user.target

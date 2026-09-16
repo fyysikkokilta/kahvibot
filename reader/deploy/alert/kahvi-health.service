@@ -1,0 +1,9 @@
+# The polled half of the escalation. A unit wedged in stop-sigkill, or alive
+# but writing nothing, emits no systemd event at all -- OnFailure= cannot see
+# either, so something has to look.
+[Unit]
+Description=Check kahvi-reader for a lock the watchdog cannot clear
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kahvi-alert check

@@ -1,0 +1,166 @@
+{
+ "results": [
+  {
+   "tag": "v9_s025_last",
+   "ckpt": "_work/model_v9_s025/last.pt",
+   "calibration": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\calibration_v9_s025_last.json",
+   "onnx": "C:\\Users\\K\u00e4ytt\u00e4j\u00e4\\Documents\\projects\\lifestyle\\coffee\\coffee_mesh_pred\\_work\\onnx_v9_s025_last",
+   "blind": {
+    "n": 99,
+    "fill_median_ml": 62.67,
+    "fill_p90_ml": 133.59,
+    "within_25ml": 0.253,
+    "nonempty_median_ml": 46.42,
+    "nonempty_n": 74,
+    "surf_median_ml": 45.25,
+    "bias_ml": -17.25,
+    "pearson_h": 0.9551
+   },
+   "field": {
+    "pots": 400,
+    "tta": 1,
+    "entropy_median": 0.1271,
+    "coverage": {
+     "0.55": {
+      "frac": 0.963,
+      "nonempty_ge_125ml": 103
+     },
+     "0.58": {
+      "frac": 0.965,
+      "nonempty_ge_125ml": 103
+     },
+     "0.6": {
+      "frac": 0.965,
+      "nonempty_ge_125ml": 103
+     },
+     "0.62": {
+      "frac": 0.965,
+      "nonempty_ge_125ml": 103
+     },
+     "0.65": {
+      "frac": 0.965,
+      "nonempty_ge_125ml": 103
+     },
+     "0.7": {
+      "frac": 0.97,
+      "nonempty_ge_125ml": 103
+     }
+    },
+    "labelled": {
+     "n": 31,
+     "n_blind": 13,
+     "abs_err_ml_median": 44.4,
+     "abs_err_ml_p90": 210.8,
+     "human_h_median": 0.229,
+     "nonempty_n": 16,
+     "nonempty_err_median": 111.6,
+     "by_gate": {
+      "0.55": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      },
+      "0.58": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      },
+      "0.6": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      },
+      "0.62": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      },
+      "0.65": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      },
+      "0.7": {
+       "kept": 31,
+       "kept_err_median": 44.4,
+       "rejected": 0,
+       "rejected_err_median": null,
+       "kept_nonempty": 16,
+       "kept_nonempty_err": 111.6,
+       "rejected_nonempty": 0,
+       "rejected_nonempty_err": null
+      }
+     }
+    }
+   },
+   "archive": {
+    "pots": 293,
+    "entropy_median": 0.044,
+    "0.55": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    },
+    "0.58": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    },
+    "0.6": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    },
+    "0.62": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    },
+    "0.65": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    },
+    "0.7": {
+     "frac": 1.0,
+     "nonempty_ge_125ml": 0
+    }
+   },
+   "note": "v8 recipe from scratch + w-sharp 0.25, 3000 steps, last",
+   "seconds": 748
+  }
+ ],
+ "micro": {
+  "detect_s": 0.03338785000050848,
+  "read_tta1_s": 0.09760880000067118,
+  "read_tta8_s": 0.5491323999995075
+ },
+ "meta": {
+  "when": "2026-09-10T08:08",
+  "field_pots": 400,
+  "field_frames": 208,
+  "field_labelled": 31,
+  "field_blind": 13,
+  "archive_day": "2026-01-30"
+ }
+}

@@ -48,6 +48,53 @@ camera_lock = ""
 # Show /graph (today's coffee level curve). Needs coffee_reader_log data.
 coffee_graph_enabled = False
 
+# Messages containing any of these get the graph instead of a photo. Matched
+# as prefixes and case-insensitively, so Finnish endings need not be listed:
+# "graafi" also catches graafin/graafia, "aikasarja" catches aikasarjan.
+# Only used when coffee_graph_enabled is True. These are checked before
+# trigger_words below, so "kahvigraafi" gives the graph, not a photo.
+# Note "maara"/"amount": someone asking for the amount arguably wants the
+# current reading rather than the day's curve - move those two lines to
+# trigger_words if that turns out to be how people use it.
+graph_trigger_words = [
+    "graafi", "graph", "kuvaaja", "aikasarja", "taikasarja",
+    "timeseries", "time series", "time-series", "trendi",
+    "määrä",
+    "amount", "ammount", "plot", "chart",
+]
+
+# --- Reader service (reader/pipeline, reader/PIPELINE.md) -------------------------
+# When set, the bot asks the resident reader service for its freshest frame and
+# reading instead of running fswebcam + a cold read_frame.py itself, and also
+# gets /graph from it. Any failure falls back to the local path above.
+# Path of the AF_UNIX socket (kahvi-reader.service), or a TCP port on a dev box.
+reader_service_socket = ""            # e.g. "/run/kahvi-sampler/ipc.sock"
+reader_service_max_age = 15.0         # reuse a service frame this many seconds old
+reader_service_timeout = 3.0          # seconds before falling back to the camera
+
+# --- Coffee-machine power plugs (power/, README there) -----------------------
+# Directory with the MQTT power logger's brews_<device>.jsonl event files.
+# When set, photo captions get a "keitetty 12 min sitten / brewed 12 min ago"
+# line per pot (or "brewing now"). "" = off.
+power_brews_dir = ""                  # e.g. "/home/konsta/kahvibot/power/data"
+power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
+
+# Caption text on replies the whole group sees (photo readings, "last brewed",
+# the survey invitation, the graph caption). False = pictures only, which is
+# the burn-in setting: the survey button still appears so people can annotate,
+# and error replies still speak. Set True once the numbers are trusted.
+caption_text_enabled = False
+
+# Burn each machine's reading into the bottom corners of the photo
+# (banner.py). Recommended while caption_text_enabled is False, since it is
+# then the only place a number appears. The plate sits over the machine it
+# describes, so the names are compass points rather than left/right: which
+# pot is 'left' depends on whether you are the camera or a person standing
+# at the machines, and that ambiguity has already caused one wrong mapping.
+photo_banner_enabled = False
+photo_banner_names = {"left": "EAST", "right": "WEST"}
+photo_banner_font = ""      # e.g. a DejaVuSans-Bold.ttf path; blank = autodetect
+
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
 coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @

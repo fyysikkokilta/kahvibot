@@ -13,7 +13,14 @@ from typing import Optional
 
 import subprocess
 
+import socket
+
+import os
+
 import re
+
+from triggers import DEFAULT_GRAPH_WORDS, graph_words_regex
+import banner as _banner
 
 import logging
 import logging.handlers
@@ -75,6 +82,35 @@ coffee_reader_log = getattr(_config, "coffee_reader_log", "")
 camera_lock = getattr(_config, "camera_lock", "")
 # /graph: today's level curve. Off by default (GRAPHS.md §8 step 4).
 coffee_graph_enabled = getattr(_config, "coffee_graph_enabled", False)
+# Words that ask for the graph rather than a photo (triggers.py). They match as
+# prefixes and compound onto the coffee words, so "kahvigraafi" and "graafin"
+# both count; set graph_trigger_words in config.py to override the list.
+graph_trigger_words = getattr(_config, "graph_trigger_words", DEFAULT_GRAPH_WORDS)
+# Reader service (reader/pipeline, reader/PIPELINE.md): the sampler daemon owns the
+# camera and the warm model, and hands the bot its freshest frame plus reading
+# over a local socket. Empty string (the default) = today's behaviour exactly.
+# Any error on this path falls back to the fswebcam + subprocess path below.
+reader_service_socket = getattr(_config, "reader_service_socket", "")
+reader_service_max_age = getattr(_config, "reader_service_max_age", 15.0)
+reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
+# Coffee-machine power plugs (power/): the MQTT logger appends brew start/end
+# events to <power_brews_dir>/brews_<device>.jsonl; the caption gets a "last
+# brewed" line per pot from them. Empty string (the default) = no such line.
+power_brews_dir = getattr(_config, "power_brews_dir", "")
+power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oikea"})
+# Caption text on replies the whole group sees. Off during burn-in: the photo
+# and the graph go out bare, while the survey button still appears, so people
+# can still annotate without the bot narrating numbers it is not yet sure of.
+# Error replies are unaffected - a silent failure is worse than a line of text.
+caption_text_enabled = getattr(_config, "caption_text_enabled", False)
+# Reading burned into the bottom corners of the photo, one plate per machine
+# (banner.py). With captions off this is the only place a number appears, and
+# it sits over the machine it describes, so no one has to work out which pot
+# "left" means. Any failure leaves the photo untouched.
+photo_banner_enabled = getattr(_config, "photo_banner_enabled", False)
+photo_banner_names = getattr(_config, "photo_banner_names",
+                             {"left": "EAST", "right": "WEST"})
+photo_banner_font = getattr(_config, "photo_banner_font", "")
 
 logger = logging.getLogger("kahvibot")
 log_handler = logging.handlers.SysLogHandler(address="/dev/log")
@@ -191,8 +227,139 @@ def read_coffee_level(image_path: str) -> Optional[dict]:
     return record
 
 
+def _reader_service_call(payload: dict):
+    """
+    One request to the reader service: a JSON line out, a JSON header line and
+    `header["bytes"]` raw bytes back. Returns (header, body) or None on any
+    failure, so callers fall back without having to think about it.
+    """
+    if not reader_service_socket:
+        return None
+    try:
+        if str(reader_service_socket).isdigit():          # dev box: loopback TCP
+            s = socket.create_connection(("127.0.0.1", int(reader_service_socket)),
+                                         timeout=reader_service_timeout)
+        else:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(reader_service_timeout)
+            s.connect(reader_service_socket)
+        try:
+            s.sendall(json.dumps(payload).encode("utf-8") + b"\n")
+            buf = b""
+            while b"\n" not in buf:              # header line; the body may follow in the same read
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+            line, _, rest = buf.partition(b"\n")
+            hdr = json.loads(line.decode("utf-8"))
+            n = int(hdr.get("bytes", 0))
+            body = bytearray(rest[:n])
+            while len(body) < n:
+                chunk = s.recv(min(65536, n - len(body)))
+                if not chunk:
+                    break
+                body += chunk
+            return hdr, bytes(body)
+        finally:
+            s.close()
+    except (OSError, ValueError):
+        logger.warning("reader service unavailable, using the camera directly", exc_info=True)
+        return None
+
+
+def _service_reading(hdr: dict) -> dict:
+    """
+    Widen the service's pots ({side,h,e,d,ml,tier,...}) to the record shape the
+    caption and the survey expect. `tier` is kept: "uncertain" readings are
+    captioned as approximate rather than hidden.
+    """
+    pots = []
+    for p in hdr.get("pots") or []:
+        tier = p.get("tier") or ("ok" if p.get("ok") else "abstain")
+        usable = tier != "abstain"
+        pots.append({
+            "side": p.get("side"), "ok": bool(usable), "tier": tier,
+            "volume_ml": p.get("ml") if usable else None,
+            "fill_fraction": p.get("fill") if usable else None,
+            "h_norm": p.get("h"), "surface_entropy": p.get("e"),
+            "detector_score": p.get("d"), "box": p.get("box"),
+            "rows_frame_px": p.get("rows"),
+            # present once the service runs the (volume, temperature) filter;
+            # the banner simply omits the line while it is absent
+            "temp_c": p.get("temp_c"),
+            "reason": None if usable else "diffuse surface estimate (occluded or no visible surface)",
+        })
+    return {"pots": pots, "src": "service", "seq": hdr.get("seq"),
+            "age": hdr.get("age"), "reused": hdr.get("reused")}
+
+
+def _service_frame():
+    """(PIL image, reading, raw jpeg) from the reader service, or None."""
+    res = _reader_service_call({"op": "frame", "max_age": reader_service_max_age})
+    if not res:
+        return None
+    hdr, body = res
+    if not hdr.get("ok") or not body:
+        return None
+    try:
+        img = Image.open(BytesIO(body))
+        img.load()
+    except OSError:
+        return None
+    return img, _service_reading(hdr), body
+
+
 # Display names for the two camera-frame sides.
 POT_NAMES = {"left": "vasen pannu / left pot", "right": "oikea pannu / right pot"}
+
+
+def _ago(seconds: float) -> str:
+    """Compact age that reads the same in both languages: "12 min", "3 h 05 min", "2 d"."""
+    seconds = max(0, int(seconds))
+    if seconds < 3600:
+        return f"{seconds // 60} min"
+    if seconds < 86400:
+        return f"{seconds // 3600} h {(seconds % 3600) // 60:02d} min"
+    return f"{seconds // 86400} d"
+
+
+def _last_brew_event(device: str) -> Optional[dict]:
+    """Last line of the power logger's brews_<device>.jsonl, or None."""
+    path = os.path.join(power_brews_dir, f"brews_{device}.jsonl")
+    with open(path, "rb") as f:
+        f.seek(0, os.SEEK_END)
+        f.seek(max(0, f.tell() - 4096))
+        lines = [ln for ln in f.read().decode("utf-8", "replace").splitlines() if ln.strip()]
+    return json.loads(lines[-1]) if lines else None
+
+
+def brew_lines() -> str:
+    """
+    "Last brewed" caption lines from the coffee-machine power plugs (power/,
+    README there), one per pot that has an event. Independent of the camera
+    reading. Any failure returns "": the photo never waits on the plugs.
+    """
+    if not power_brews_dir:
+        return ""
+    now = datetime.now(timezone.utc)
+    out = []
+    for side, device in power_devices.items():
+        try:
+            ev = _last_brew_event(device)
+            if not ev:
+                continue
+            name = POT_NAMES.get(side, side)
+            if ev.get("event") == "start":
+                started = datetime.fromisoformat(ev["t"])
+                if (now - started).total_seconds() < 20 * 60:
+                    out.append(f"🫖 {name}: keittää nyt / brewing now")
+                continue
+            age = _ago((now - datetime.fromisoformat(ev["end"])).total_seconds())
+            out.append(f"🫖 {name}: keitetty {age} sitten / brewed {age} ago")
+        except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
+            logger.debug("no brew info for %s", device, exc_info=True)
+    return "\n".join(out)
 
 
 def format_reading(record: dict) -> str:
@@ -215,6 +382,8 @@ def format_reading(record: dict) -> str:
                 cups = (str(whole) if whole else "") + ("½" if half_cups != whole else "")
                 unit = "kuppi / cup" if half_cups == 1.0 else "kuppia / cups"
                 amount = f"~{cups} {unit}"
+            if pot.get("tier") == "uncertain":
+                amount = f"n. {amount} (epävarma / uncertain)"
             lines.append(f"☕ {name}: {amount}")
         else:
             lines.append(f"☕ {name}: en näe pintaa / can't tell")
@@ -227,7 +396,15 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     pillow image, plus the coffee level reading (or None) measured from the
     frame on disk before it is watermarked or re-encoded, plus the raw
     pre-watermark JPEG bytes (the survey caches the frame the reader saw).
+
+    With a reader service configured, the frame and its reading come from the
+    service (a frame younger than reader_service_max_age is reused, otherwise
+    the service captures one), and the service is the one that logs it. The
+    camera path below is the fallback and the default.
     """
+    got = _service_frame()
+    if got is not None:
+        return got
     with NamedTemporaryFile(suffix=".jpg") as f:
         # Use the option "-S 20" to discard 20 frames before taking the picture,
         # so that the camera has time to adjust the brightness automatically.
@@ -265,7 +442,13 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
 def send_webcam_photo(update: Update, ctx: CallbackContext):
     bot = ctx.bot
 
-    update.message.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
+    # effective_message, not message: the trigger-word filter also matches
+    # edited messages and channel posts, where update.message is None (this was
+    # the AttributeError seen 8 times in the 2026 journal).
+    msg = update.effective_message
+    if msg is None:
+        return
+    msg.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
     img, reading, raw = take_picture()
 
@@ -277,6 +460,10 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
         else:
             img.paste(bot.watermark, mask=bot.watermark)
 
+    if photo_banner_enabled:
+        img = _banner.safe_draw(img, reading, logger=logger, names=photo_banner_names,
+                                font_path=photo_banner_font or None)
+
     # img.tobytes() didn't work for some reason, so using BytesIO.
     # see https://stackoverflow.com/a/54165463
     bio = BytesIO()
@@ -285,21 +472,26 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.seek(0)
 
     caption = None
-    if coffee_reader_show and reading is not None:
-        caption = format_reading(reading) or None
+    if caption_text_enabled:
+        if coffee_reader_show and reading is not None:
+            caption = format_reading(reading) or None
+        brews = brew_lines()
+        if brews:
+            caption = (caption + "\n" + brews) if caption else brews
 
     offer = markup = None
     if survey and update.effective_user:
         offer = survey.maybe_offer(update.effective_user.id, reading)
+        # reading_shown gates the "is this reading wrong?" prompt, which makes no
+        # sense when no reading is on screen; the randomly offered help button
+        # does not depend on it and still appears.
         extra, markup = survey.decorate(offer, reading_shown=bool(caption))
-        if extra:
+        if extra and caption_text_enabled:
             caption = (caption + "\n\n" + extra) if caption else extra
 
-    msg = update.message
-    if msg:
-        sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
-        if survey:
-            survey.register_photo(sent, raw, reading, offer)
+    sent = msg.reply_photo(bio, caption=caption, reply_markup=markup)
+    if survey:
+        survey.register_photo(sent, raw, reading, offer)
 
 
 def send_graph(update: Update, ctx: CallbackContext):
@@ -308,14 +500,23 @@ def send_graph(update: Update, ctx: CallbackContext):
     read_coffee_level()'s: any exception degrades to a text reply, because a
     broken graph must never take out the bot.
     """
-    msg = update.message
+    msg = update.effective_message
     if msg is None:
         return
     if not coffee_graph_enabled:
         return  # feature off: stay silent, same as any unknown command
     try:
-        import graphs
-        png, caption = graphs.graph_reply(coffee_reader_log)
+        # The reader service keeps today's series in memory and caches the
+        # render on the last usable reading (PIPELINE.md); parsing the log
+        # here is the fallback.
+        res = _reader_service_call({"op": "graph"})
+        if res and res[0].get("ok"):
+            png, caption = (res[1] or None), res[0].get("caption")
+        else:
+            import graphs
+            png, caption = graphs.graph_reply(coffee_reader_log)
+        if png is not None and not caption_text_enabled:
+            caption = None          # the graph is the message; no narration
     except Exception:
         logger.warning("graph render failed", exc_info=True)
         png = None
@@ -370,6 +571,16 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("eikiitos", survey.on_eikiitos))
         dispatcher.add_handler(CommandHandler("kahvistatsit", survey.on_stats))
         survey.schedule_jobs(updater.job_queue)
+    # Graph keywords are matched before the photo keywords, because within a
+    # handler group python-telegram-bot runs only the first match: "kahvigraafi"
+    # contains "kahvi" too, and the graph is the more specific request. The
+    # handler is registered only when /graph is enabled, so with the feature off
+    # these words fall through to the photo exactly as they did before.
+    graph_regex = graph_words_regex(graph_trigger_words) if coffee_graph_enabled else None
+    if graph_regex is not None:
+        dispatcher.add_handler(MessageHandler(
+            Filters.text & Filters.regex(graph_regex), send_graph))
+
     trigger_words_regex = re.compile("|".join(trigger_words), re.IGNORECASE)
     dispatcher.add_handler(MessageHandler(Filters.text & Filters.regex(trigger_words_regex), send_webcam_photo))
     dispatcher.add_error_handler(error_callback)

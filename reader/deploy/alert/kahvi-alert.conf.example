@@ -1,0 +1,5 @@
+# Read by /usr/local/bin/kahvi-alert. Mode 0600, root: it names the file the
+# bot token is read from, though it never contains the token itself.
+CHAT_ID=            # numeric Telegram id; bots cannot resolve @usernames
+CONFIG_PY=/home/marci/dev/kiltiskahvi/config.py
+READINGS=/home/konsta/coffee-data/readings-%Y-%m.jsonl
