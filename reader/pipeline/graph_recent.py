@@ -180,16 +180,36 @@ def _draw_power(d, top, power, t0, t1, fonts):
 
 
 def _dashed(d, pts, colour, width=2, dash=10, gap=6):
-    """Pillow has no dash pattern; walk the polyline and stroke alternate runs."""
+    """Pillow has no dash pattern; walk the polyline and stroke alternate runs.
+
+    `carry` converges on `dash` across a long polyline of short segments, and
+    once `dash - carry` falls below the ULP of `pos`, `pos + step` rounds back
+    to `pos`: the walk stops advancing, `end - pos` stays 0 so the run never
+    toggles, `carry` never grows, and the loop spins forever. Not hypothetical
+    -- it wedged the reader for 21 h on 2026-09-15 on the temperature line,
+    where a 10 s cadence over a near-constant temp_c produces exactly that
+    geometry (carry 13.999999999999998 against dash 14, step half an ULP).
+
+    So a run too small to move `pos` counts as finished rather than retried,
+    and `stalls` bounds the degenerate case where even a full fresh run cannot
+    advance. Every iteration now either moves `pos` or runs the counter down.
+    """
     carry, on = 0.0, True
     for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
         seg = math.hypot(x2 - x1, y2 - y1)
-        if seg <= 0:
+        if not seg > 0:                     # > 0 rather than <= 0, to skip NaN
             continue
-        pos = 0.0
+        pos, stalls = 0.0, 0
         while pos < seg:
             step = (dash if on else gap) - carry
-            end = min(pos + step, seg)
+            end = min(pos + step, seg) if step > 0 else pos
+            if end <= pos:
+                on, carry = not on, 0.0     # this run is spent; start the next
+                stalls += 1
+                if stalls > 2:
+                    break                   # dash and gap are both unusable
+                continue
+            stalls = 0
             if on:
                 d.line([x1 + (x2 - x1) * pos / seg, y1 + (y2 - y1) * pos / seg,
                         x1 + (x2 - x1) * end / seg, y1 + (y2 - y1) * end / seg],
