@@ -1,0 +1,9 @@
+# OnFailure= handler: fires when %i enters the failed state. With
+# Restart=always on kahvi-reader that happens only once StartLimitBurst is
+# exhausted -- i.e. exactly when restarting has stopped fixing the problem.
+[Unit]
+Description=Telegram alert for %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kahvi-alert onfailure %i

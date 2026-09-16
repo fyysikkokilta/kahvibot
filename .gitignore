@@ -103,3 +103,6 @@ power/data/
 reader/**/latest.json
 reader/**/readings-*.jsonl
 .pytest_cache/
+
+# Holds a personal Telegram chat id; copy the .example and fill it in locally.
+reader/deploy/alert/kahvi-alert.conf
