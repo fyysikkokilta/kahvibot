@@ -106,3 +106,12 @@ reader/**/readings-*.jsonl
 
 # Holds a personal Telegram chat id; copy the .example and fill it in locally.
 reader/deploy/alert/kahvi-alert.conf
+
+# gym run artifacts: the benchmarks and gate sweeps write one report per
+# checkpoint and config. The curated summaries (BENCH.md, MODELS.md, RBPF.md,
+# BENCH_MODELS.md, GATE3_v8.md) are committed deliberately; the rest are output.
+reader/gym/*.json
+reader/gym/GATE2_*.md
+reader/gym/GATE3_*.md
+!reader/gym/GATE3_v8.md
+reader/gym/BENCH_MODELS_*.md
