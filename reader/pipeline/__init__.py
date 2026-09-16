@@ -8,13 +8,13 @@ ok/uncertain/abstain decision is made by the consumer via `gate.Gate`, so it is
 a config value rather than a model redeploy.
 
 Modules:
-  clock     RealClock / VirtualClock (the gym drives the latter)
-  camera    Frame, FswebcamCamera (Pi), ArchiveCamera (gym)
+  clock     RealClock / VirtualClock (the latter for tests)
+  camera    Frame, FswebcamCamera (the Pi's fswebcam under a flock)
   reader    WarmReader: model loaded once, cached boxes, per-call TTA
   gate      entropy tiers
   store     single-writer JSONL with monthly rotation + latest.json sidecar
   graphing  day buffer + graph cache keyed on the last usable reading
   service   ReaderService: sampling loop + request handling
   ipc       socket server/client (AF_UNIX on the Pi, loopback TCP elsewhere)
-  botclient what kahvibot calls
+  botclient reference client for the socket; handy for debugging by hand
 """

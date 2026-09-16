@@ -7,7 +7,7 @@ Two signals are available per pot:
   in millilitres, when that reading is younger than the agreement window
   (the streamlined sampler reads every ~10 s, so nearly always).
 
-Field and blind-set evidence (gym/GATE2_*.md, gym/GATE3_*.md): for v8, entropy
+Field and blind-set evidence (the gym's GATE2/GATE3 reports): for v8, entropy
 does not separate accurate readings from bad ones, on either camera epoch,
 while neighbour agreement does — on blind non-empty clicks the 40 % most
 consistent readings have a 14 ml median error against 25 ml for the 40 %

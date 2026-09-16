@@ -2,7 +2,6 @@
 (same arguments, same lock); ArchiveCamera replays the frame archive for the gym."""
 from __future__ import annotations
 
-import collections
 import io
 import os
 import subprocess
@@ -111,73 +110,3 @@ class FswebcamCamera:
                 except (OSError, ValueError):
                     pass
                 lock_fd.close()
-
-
-def _dark_jpeg(size=(1280, 720)) -> bytes:
-    buf = io.BytesIO()
-    Image.new("RGB", size, (2, 2, 2)).save(buf, "JPEG", quality=50)
-    return buf.getvalue()
-
-
-class ArchiveSource:
-    """Frames from the archive by wall time, with the decoded RGB and luma cached
-    per stem (the sampler ticks every 10 s against a 5-minute archive). When no
-    frame lies within `max_gap_s` (nights, poller off) a dark frame is returned
-    so the dark gate behaves as it would in the real room."""
-
-    def __init__(self, archive, max_gap_s: float = 1200.0, cache_size: int = 16):
-        self.archive = archive
-        self.max_gap_s = max_gap_s
-        self._cache: "collections.OrderedDict[str, tuple]" = collections.OrderedDict()
-        self.cache_size = cache_size
-        self._dark = _dark_jpeg()
-        self._dark_rgb = None
-        self.frames_served = 0
-        self.dark_served = 0
-
-    def frame_at(self, wall: float, mono: float) -> Frame:
-        self.frames_served += 1
-        hit = self.archive.nearest(wall)
-        if hit is None or abs(hit.epoch - wall) > self.max_gap_s:
-            self.dark_served += 1
-            fr = Frame(self._dark, wall, mono, source="dark", ident="dark")
-            fr._luma = 2.0
-            return fr
-        ent = self._cache.get(hit.stem)
-        if ent is None:
-            jpeg = hit.read()
-            probe = Frame(jpeg, wall, mono)
-            ent = (jpeg, probe.rgb(), probe.luma())
-            self._cache[hit.stem] = ent
-            if len(self._cache) > self.cache_size:
-                self._cache.popitem(last=False)
-        else:
-            self._cache.move_to_end(hit.stem)
-        jpeg, rgb, luma = ent
-        fr = Frame(jpeg, wall, mono, source="archive", ident=hit.stem)
-        fr._rgb, fr._luma = rgb, luma
-        return fr
-
-
-class ArchiveCamera:
-    """Camera facade over ArchiveSource for the ReaderService: charges a fixed
-    Pi capture cost to the (virtual) clock, then returns the frame at the
-    capture instant."""
-
-    def __init__(self, archive, clock, capture_cost_s: float = 2.0, max_gap_s: float = 1200.0,
-                 source: Optional[ArchiveSource] = None):
-        self.src = source or ArchiveSource(archive, max_gap_s)
-        self.clock = clock
-        self.capture_cost_s = capture_cost_s
-        self.captures = 0
-
-    @property
-    def dark_captures(self):
-        return self.src.dark_served
-
-    def capture(self) -> Frame:
-        t_mono = self.clock.mono()
-        t_wall = self.clock.wall()
-        self.clock.sleep(self.capture_cost_s)
-        self.captures += 1
-        return self.src.frame_at(t_wall, t_mono)

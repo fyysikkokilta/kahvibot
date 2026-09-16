@@ -9,7 +9,7 @@
 #   * CPUQuota 60 %: the old 25 % quota turned a 10 s sampler into a 33 s one.
 #   * reuse-max-age 30 s: ticks land ~20 s apart on this Pi, so a 15 s window
 #     sent most bot requests down the slow path.
-#   * gate agree: entropy carries no accuracy signal (reader/gym/GATE3_v8.md).
+#   * gate agree: entropy carries no accuracy signal (the gym's GATE3_v8 report).
 #   * MemoryMax 320M: the Pi has 909 MB and also runs the bot and zigbee2mqtt.
 
 [Unit]

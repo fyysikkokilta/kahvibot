@@ -54,7 +54,7 @@ def main(argv=None) -> int:
     ap.add_argument("--gate-uncertain", type=float, default=0.68)
     ap.add_argument("--gate-mode", default="agree", choices=["entropy", "agree"],
                     help="agree: a reading is ok when it agrees with the previous one of the same pot "
-                         "(gym/GATE3_*.md); entropy is only the fallback without a recent neighbour")
+                         "(the gym's GATE3 reports); entropy is only the fallback without a recent neighbour")
     ap.add_argument("--agree-ok-ml", type=float, default=40.0)
     ap.add_argument("--agree-uncertain-ml", type=float, default=90.0)
     ap.add_argument("--threads", type=int, default=2)

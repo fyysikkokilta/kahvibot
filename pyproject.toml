@@ -37,19 +37,12 @@ power = [
     "numpy>=1.23",
 ]
 
-# The simulator and benchmarks (reader/gym/). Desktop only - never install this
-# on the Pi. Replays archived frames through the pipeline and scores checkpoints.
-gym = [
-    "kahvibot[reader]",
-    "matplotlib>=3.5",
-    "psutil>=5.9",
-]
-
 # Fitting the density head on a frozen backbone (reader/training/). Needs torch,
 # and needs the research checkout for the frame archive and hand-click labels;
 # point COFFEE_RESEARCH_DIR at it.
 training = [
-    "kahvibot[gym]",
+    "kahvibot[reader]",
+    "matplotlib>=3.5",
     "torch>=2.0",
 ]
 
@@ -67,7 +60,7 @@ py-modules = ["banner", "triggers", "graphs", "feedback"]
 
 [tool.setuptools.packages.find]
 include = ["reader*"]
-exclude = ["reader.gym*", "reader.training*"]
+exclude = ["reader.training*"]
 
 [tool.pytest.ini_options]
 testpaths = ["test_triggers.py", "test_banner.py", "reader/pipeline", "power/tests"]

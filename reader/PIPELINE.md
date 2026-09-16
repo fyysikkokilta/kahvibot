@@ -1,8 +1,10 @@
 # One reader — the streamlined kahvibot pipeline
 
-Status: implemented in `reader/pipeline/`, benchmarked in `reader/gym/` (both in the kahvibot repo; originally `coffee10/` in the research checkout)
-(see `gym/BENCH.md`), not yet deployed. Companion to SAMPLER.md and GRAPHS.md;
-the field evidence it answers is in `coffee/kahviraspi_logs_2026-09-09/ANALYSIS.md`.
+Status: implemented in `reader/pipeline/` and live on kahviraspi since
+2026-09-15 (§3). The benchmarks behind the numbers below were run in the gym,
+which lives in the research checkout (`coffee10/gym/`, `COFFEE_RESEARCH_DIR`)
+rather than here — it needs the frame archive and hand-click labels, and this
+repository ships only what the Pi runs.
 
 ## 0. What the field logs said
 
@@ -56,9 +58,9 @@ One resident process, `ReaderService`, owns the camera and the model:
 
 Failure discipline is `read_coffee_level()`'s: the photo always goes out.
 
-## 2. Benchmark (gym, Pi-anchored virtual time, real frames, real inference)
+## 2. Benchmark (gym in the research checkout, Pi-anchored virtual time, real frames)
 
-From `gym/BENCH.md` (typical day = 2026-09-01's 17 requests; burst = 09-03's 98):
+From the gym's BENCH.md (typical day = 2026-09-01's 17 requests; burst = 09-03's 98):
 
 | | legacy | streamlined |
 |---|---|---|
@@ -76,7 +78,7 @@ From `gym/BENCH.md` (typical day = 2026-09-01's 17 requests; burst = 09-03's 98)
 Latencies include an assumed 3 s Telegram upload in both designs. The
 streamlined latency is the upload plus, when no fresh frame exists, one capture.
 
-## 2b. Why the gate changed signal (gym/GATE2_*.md, GATE3_*.md, BENCH_MODELS*.md)
+## 2b. Why the gate changed signal (the gym's GATE2/GATE3/BENCH_MODELS reports)
 
 Measured against human clicks, blind archive set (99 records, Jan–Jun camera) and
 the field set (31 pots, 2026-09 camera, survey clicks):
