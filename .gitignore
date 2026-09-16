@@ -115,3 +115,6 @@ reader/gym/GATE2_*.md
 reader/gym/GATE3_*.md
 !reader/gym/GATE3_v8.md
 reader/gym/BENCH_MODELS_*.md
+
+# Supabase CLI scratch state, not project config
+supabase/.temp/
