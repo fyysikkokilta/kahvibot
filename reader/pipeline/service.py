@@ -168,6 +168,9 @@ class ReaderService:
         self.last_lit: Optional[FrameResult] = None
         self.last_lit_tick_mono: Optional[float] = None
         self.next_tick_mono = clock.mono()
+        # Liveness for the systemd watchdog: set after every tick that returns,
+        # so a tick that never comes back is visible as a stall (notify.py).
+        self.last_tick_mono = clock.mono()
         self.daybuf = DayBuffer()
         # One filter per pot. Volume is sampled because its observation is
         # multimodal; temperature rides along in a Kalman filter inside each
@@ -374,6 +377,7 @@ class ReaderService:
                     self.clock.advance(self.next_tick_mono - now)   # jump to the tick instant
             start = self.clock.mono()
             self.tick()
+            self.last_tick_mono = self.clock.mono()
             self.store.flush()
             now = self.clock.mono()
             target = start + self.cadence()

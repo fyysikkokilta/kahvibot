@@ -18,6 +18,7 @@ from pipeline.clock import RealClock                # noqa: E402
 from pipeline.gate import Gate                      # noqa: E402
 from pipeline.graphing import load_kahvibot_graphs  # noqa: E402
 from pipeline.ipc import serve_forever              # noqa: E402
+from pipeline.notify import LoopHealth, SystemdNotifier  # noqa: E402
 from pipeline.reader import WarmReader              # noqa: E402
 from pipeline.service import ReaderService, ServiceConfig  # noqa: E402
 from pipeline.store import ReadingsStore            # noqa: E402
@@ -112,10 +113,39 @@ def main(argv=None) -> int:
                                             seeded, store.path_for(now))
     except Exception:  # noqa: BLE001
         logging.getLogger("kahvi").warning("could not recover today's readings", exc_info=True)
-    logging.getLogger("kahvi").info("reader service up: interval=%.0fs socket=%s gate=%s e<=%.2f/%.2f a<=%.0f/%.0f ml",
-                                    a.interval, sock, a.gate_mode, a.gate_ok, a.gate_uncertain,
-                                    a.agree_ok_ml, a.agree_uncertain_ml)
-    serve_forever(svc, sock)
+    log = logging.getLogger("kahvi")
+    log.info("reader service up: interval=%.0fs socket=%s gate=%s e<=%.2f/%.2f a<=%.0f/%.0f ml",
+             a.interval, sock, a.gate_mode, a.gate_ok, a.gate_uncertain,
+             a.agree_ok_ml, a.agree_uncertain_ml)
+    # systemd watchdog. Without it a spinning loop reads as `active (running)`
+    # and Restart=always never fires, because the process never exits: that is
+    # exactly how 2026-09-15 became a 21 h outage. The ping is withheld -- and
+    # the reason logged -- the moment the loop stops completing ticks.
+    notifier = SystemdNotifier()
+    health = LoopHealth()
+    hb = {"last_ping": 0.0, "withheld": False}
+    ping_every = notifier.ping_interval
+
+    def heartbeat() -> None:
+        now = clock.mono()
+        reason = health.check(now, svc.last_tick_mono, svc.stats.ticks, svc.cadence())
+        if reason is not None:
+            if not hb["withheld"]:
+                log.error("watchdog: withholding ping: %s", reason)
+                hb["withheld"] = True
+            return
+        if hb["withheld"]:
+            log.info("watchdog: ticking again, resuming pings")
+            hb["withheld"] = False
+        if now - hb["last_ping"] >= ping_every:
+            notifier.watchdog()
+            hb["last_ping"] = now
+
+    if notifier.enabled:
+        notifier.ready()
+        log.info("systemd watchdog on: ping every %.0f s, stall limit %.0f s",
+                 ping_every, health.stall_after(svc.cadence()))
+    serve_forever(svc, sock, heartbeat=heartbeat if notifier.enabled else None)
     return 0
 
 

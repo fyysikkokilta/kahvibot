@@ -224,8 +224,12 @@ class Client:
             s.close()
 
 
-def serve_forever(service, addr, poll_s: float = 0.25):
-    """Daemon main loop: requests first, then due ticks, then a short sleep."""
+def serve_forever(service, addr, poll_s: float = 0.25, heartbeat=None):
+    """Daemon main loop: requests first, then due ticks, then a short sleep.
+
+    `heartbeat`, when given, is called once per pass -- after a request and
+    after `run_due` -- and decides whether to ping the systemd watchdog. It is
+    optional so the gym and the tests drive the loop without systemd."""
     inbox: "queue.Queue[Request]" = queue.Queue()
     server = IPCServer(addr, inbox, service=service)
     server.start()
@@ -234,10 +238,14 @@ def serve_forever(service, addr, poll_s: float = 0.25):
             try:
                 req = inbox.get(timeout=min(poll_s, service.seconds_to_next_tick() or poll_s))
                 execute(service, req)
+                if heartbeat is not None:
+                    heartbeat()
                 continue
             except queue.Empty:
                 pass
             service.run_due()
+            if heartbeat is not None:
+                heartbeat()
     finally:
         server.stop.set()
         service.store.flush(force=True)

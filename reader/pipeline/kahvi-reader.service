@@ -16,11 +16,25 @@
 Description=Coffee level reader service (camera + model + IPC)
 After=time-sync.target network-online.target mosquitto.service
 Wants=time-sync.target mosquitto.service
+# When the burst below is exhausted the unit lands in `failed` and stays
+# there: restarting has demonstrably not fixed it, which is the one case
+# worth a Telegram message rather than another retry.
+OnFailure=kahvi-alert@%n.service
 StartLimitIntervalSec=1h
 StartLimitBurst=5
 
 [Service]
-Type=simple
+# notify, not simple: the daemon pings WATCHDOG=1 only while its loop is
+# still completing ticks, so a spin that leaves the process alive but
+# useless (2026-09-15, 21 h) becomes a restart in ~2 min. Restart=always
+# alone cannot catch that case, because the process never exits.
+# Turns the watchdog's SIGABRT into a full Python traceback in the journal.
+# Without it a watchdog kill says only that the loop stopped; with it, the
+# dump named the spinning frame directly (2026-09-16).
+Environment=PYTHONFAULTHANDLER=1
+Type=notify
+NotifyAccess=main
+WatchdogSec=120
 User=konsta
 Group=konsta
 SupplementaryGroups=video
