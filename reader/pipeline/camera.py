@@ -1,5 +1,5 @@
 """Camera abstraction. FswebcamCamera is byte-for-byte the deployed capture
-(same arguments, same lock); ArchiveCamera replays the frame archive for the gym."""
+(same arguments, same lock)."""
 from __future__ import annotations
 
 import io
