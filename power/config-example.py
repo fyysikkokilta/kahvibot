@@ -13,16 +13,6 @@ def _env(name, default):
     return os.environ.get(name, default)
 
 
-# Get a token from @BotFather
-TELEGRAM_TOKEN = _env("TELEGRAM_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-
-# Optional numeric chat id to receive bot error notifications. Empty = off.
-ADMIN_CHAT_ID = _env("ADMIN_CHAT_ID", "")
-
-# Minimum seconds between same-action (/plot, /brew) commands per chat.
-# 0 disables the throttle.
-RATE_LIMIT_SECONDS = float(_env("RATE_LIMIT_SECONDS", "3"))
-
 MQTT_BROKER = _env("MQTT_BROKER", "localhost")
 MQTT_PORT = int(_env("MQTT_PORT", "1883"))
 MQTT_USER = _env("MQTT_USER", "zigbee2mqtt")
@@ -36,15 +26,9 @@ DEFAULT_DEVICE = _env("DEFAULT_DEVICE", "oikea")
 # draws ~1.4 kW) and ends when it falls below HEAT. HEAT must sit clearly above
 # the hotplate's own draw (~100 W on a Moccamaster): with the plate cycling
 # around the threshold one brew splits into several and the durations that feed
-# the cup estimate become garbage. Look at /plot before lowering this.
+# the cup estimate become garbage. Plot the CSV before lowering this.
 BREW_THRESHOLD = float(_env("BREW_THRESHOLD", "300"))
 HEAT = float(_env("HEAT", "250"))
-
-# Telegram chat ids the bot answers in (commands and keyword triggers alike).
-# Empty = every chat it is a member of. Set this when the bot shares a group
-# with kahvibot, which reacts to the same keywords.
-ALLOWED_CHATS = [int(x) for x in _env("ALLOWED_CHATS", "").split(",") if x.strip()]
-PLOT_HOURS = float(_env("PLOT_HOURS", "24"))
 
 
 def _parse_calibration(raw):

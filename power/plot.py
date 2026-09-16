@@ -90,7 +90,7 @@ def _hysteresis_events(df, start_threshold, end_threshold):
     at the end of the data is reported up to the last sample. Only the samples
     that can change the state are visited, so a 150k-row CSV costs a few hundred
     iterations instead of a pandas iterrows() over every row (tens of seconds on
-    a Raspberry Pi, once per /brew or /plot).
+    a Raspberry Pi, once per report).
     """
     if df.empty:
         return []
@@ -222,7 +222,7 @@ def plot_power(device=DEFAULT_DEVICE, out_png=None):
     """Render (or return the cached) power plot for the device since midnight.
 
     The plot is keyed on the CSV's mtime/size, so it is only re-rendered when
-    new rows arrive; repeated /plot calls reuse the same PNG.
+    new rows arrive; repeated calls reuse the same PNG.
     """
     csv_path = get_csv_path(device)
     if not csv_path.is_file():

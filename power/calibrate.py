@@ -3,7 +3,7 @@
 
 Each calibration point is (brew duration in seconds, cups). plot.estimate_cups
 fits a line through these points (or scales linearly for a single point) and
-/brew reports an estimated cup count for a new brew's duration.
+brew_summary() reports an estimated cup count for a brew's duration.
 
 Usage:
   python3 calibrate.py list                     recent brews per device

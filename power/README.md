@@ -1,19 +1,29 @@
 # power (omatsufe)
 
-MQTT power logger and Telegram bot for the two IKEA smart plugs on the guild-room
-Moccamasters. Merged into the kahvibot repo from `luu3000/omatsufe` with its history;
-it still runs standalone from this directory. kahvibot reads the brew event log this
-logger writes (`data/brews_<device>.jsonl`) for its "keitetty 12 min sitten / brewed
-12 min ago" caption line; see `power_brews_dir` in the repo's `config-example.py`.
+MQTT power logger for the two IKEA smart plugs on the guild-room Moccamasters.
+Merged into the kahvibot repo from `luu3000/omatsufe` with its history; it still
+runs standalone from this directory.
+
+**This directory owns the power domain and nothing else.** It measures the plugs
+and writes the data; it serves no users. omatsufe's Telegram bot (`bot.py`,
+`aliases.py`) was dropped when the subtree landed here: it is the omatsufe
+authors' own outward-facing code, it duplicated triggers with kahvibot -- the two
+answered the same "kahvi" in the same group, which is why `ALLOWED_CHATS` had to
+exist -- and in this repo the outward-facing side belongs to the bot at the root.
+It is still in `luu3000/omatsufe`, which is its home.
+
+Consumers of what is written here: kahvibot reads `data/brews_<device>.jsonl` for
+its "keitetty 12 min sitten / brewed 12 min ago" caption (`power_brews_dir` in the
+repo's `config-example.py`). The reader does not read these files at all -- it
+subscribes to the broker directly (`reader/pipeline/power.py`).
 
 ## Components
 
 - **`mqtt_logger.py`** — subscribes to MQTT topics (`zigbee2mqtt/<device>`), appends `timestamp,power` rows to `data/power_<device>.csv` (pruned to the newest 150k samples), and detects brews as they happen, appending `start` and `end` events to `data/brews_<device>.jsonl` (never pruned; this is the machine's history and what kahvibot reads).
 - **`plot.py`** — reads the CSVs, plots power over time (log scale, last 24 h), and detects "brews" as power events above a threshold.
-- **`bot.py`** — Telegram bot with `/plot`, `/brew`, `/help` commands plus keyword aliases (`kahvi`, `tsufe`, `brew`, `plot`, ...).
-- **`aliases.py`** — keyword patterns that trigger bot actions.
+- **`calibrate.py`** — operator CLI for teaching the cup-count fit real brews.
 
-Device names are validated against the configured `DEVICES` whitelist (bot) and
+Device names are validated against the configured `DEVICES` whitelist and
 against known MQTT topics (logger) before being used to build file paths, and
 `plot.py`'s `get_csv_path()` rejects any device name containing characters
 outside `[A-Za-z0-9_-]` as defense in depth.
@@ -40,17 +50,10 @@ outside `[A-Za-z0-9_-]` as defense in depth.
    python3 mqtt_logger.py
    ```
 
-4. Start the bot (set `TELEGRAM_TOKEN` in `config.py` or the environment first):
-
-   ```bash
-   python3 bot.py
-   ```
-
 ## Configuration
 
 | Setting | Default | Description |
 |---|---|---|
-| `TELEGRAM_TOKEN` | (none) | Bot token from @BotFather |
 | `MQTT_BROKER` | `localhost` | MQTT broker host |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_USER` | `zigbee2mqtt` | MQTT username |
@@ -60,8 +63,6 @@ outside `[A-Za-z0-9_-]` as defense in depth.
 | `DEFAULT_DEVICE` | `oikea` | Device used by default |
 | `BREW_THRESHOLD` | `300` | W above which a brew starts (the heating element draws ~1.4 kW) |
 | `HEAT` | `250` | W below which a brew ends. Must sit clearly above the hotplate's own draw (~100 W on a Moccamaster), or the plate cycling around the threshold splits one brew into several and the durations behind the cup estimate become garbage. Was 100. |
-| `ALLOWED_CHATS` | (none) | Comma-separated Telegram chat ids the bot answers in; empty = every chat. Set it when the bot shares a group with kahvibot, which reacts to the same keywords |
-| `PLOT_HOURS` | `24` | Legacy — plots now always show data from midnight |
 | `CUP_CALIBRATION` | (none) | Reference brews for cup-count estimation, as `seconds:cups` pairs (e.g. `400:8,300:6`) |
 
 ### Cup-count estimation
@@ -69,8 +70,8 @@ outside `[A-Za-z0-9_-]` as defense in depth.
 Moccamaster-style filter machines draw roughly constant power for as long as
 water is still passing through the filter, so brew duration scales with the
 amount of water brewed. Once you've measured a couple of reference brews
-(known cup count + observed duration from `/brew`), set `CUP_CALIBRATION` and
-`/brew` will report an estimated cup count alongside the end time and duration.
+(known cup count + observed duration), set `CUP_CALIBRATION` and
+`brew_summary()` reports an estimated cup count alongside the end time and duration.
 
 - One point (`secs:cups`) assumes brewing starts immediately with no fixed
   warm-up offset, i.e. cups scale linearly from zero.
@@ -103,7 +104,7 @@ fixed warm-up offset; one point scales linearly from zero.
 `data/brews_<device>.jsonl` gets one JSON line when a brew starts
 (`{"event": "start", "t": ..., "power": ...}`) and one when it ends
 (`{"event": "end", "start": ..., "end": ..., "duration_s": ..., "peak_w": ...}`),
-timestamps in UTC. The same hysteresis rule as `/brew` uses, applied as samples arrive,
+timestamps in UTC. The same hysteresis rule the summary uses, applied as samples arrive,
 so nothing has to re-scan the CSV, and the file survives CSV pruning.
 
 ### zigbee2mqtt reporting
@@ -113,12 +114,6 @@ minimum interval; set the `power` reporting for each plug in zigbee2mqtt to a sh
 minimum interval (a few seconds) and a small reportable change (a few watts), otherwise
 brew start is timestamped late and a short brew can be missed entirely.
 
-## Bot commands
-
-- `/plot [device]` — power plot for a device
-- `/brew [device]` — last brew end time/duration
-- `/help` — available commands
-
 ## Tests
 
 ```bash
@@ -127,4 +122,4 @@ pytest
 ```
 
 Tests use a stubbed `config` module (see `tests/conftest.py`) so no real `config.py`
-or MQTT/Telegram credentials are needed.
+or MQTT credentials are needed.
