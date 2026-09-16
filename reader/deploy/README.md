@@ -4,23 +4,27 @@
 Anything on the Pi that is not in this repository is drift, and drift is what
 made 2026-09-15 take 21 hours to understand.
 
-## Known drift, not yet resolved
+## How the Pi gets its code
 
-As of 2026-09-16 the Pi's checkout at `/home/marci/dev/kiltiskahvi` is a real
-clone of `git@github.com:fyysikkokilta/kahvibot.git`, but:
+`git fetch && git checkout`, then `reader/install_reader.sh`. Resolved on
+2026-09-16; before that the Pi sat on a local branch `pi-live-20260829` that
+existed nowhere on origin, with `reader/` untracked entirely, so deploys were
+tarballs over SSH.
 
-* it sits on a local branch `pi-live-20260829` (881d0d5), not on anything that
-  exists on origin;
-* **`reader/` is untracked there** — the reader has never been under version
-  control on the Pi, which is why the scripts below ship it as a tarball;
-* `kahvibot` is modified in the working tree, and `config.py.bak-20260915`,
-  `banner.py` and `triggers.py` are untracked.
+Two things made that stick, both fixed:
 
-So `20_deploy_watchdog.sh` copying files over SSH is a stopgap, not the intended
-mechanism. The fix is to get the Pi onto a branch that exists on origin with
-`reader/` tracked, after which deployment is `git fetch && git checkout` plus
-`reader/install_reader.sh`. That migration touches the running bot, so it wants
-a maintenance window rather than a drive-by.
+* `origin` was `git@github.com:...` and marci's key was never authorised for
+  GitHub, so the Pi could not fetch at all. It is now the HTTPS URL. The
+  repository is public, the Pi only ever pulls, and nothing needs a key.
+* `reader/` was untracked. It is now 49 files under git, and `install_reader.sh`
+  writes the unit from the repo's own template, so the watchdog, `OnFailure=`
+  and `PYTHONFAULTHANDLER` come with it.
+
+The venv is not in git and is not rebuilt: `install_reader.sh` only creates it
+when absent, which matters because pip-installing onnxruntime on a Pi 3B is slow
+and not always possible. Preserve `reader/venv` across any future tree surgery.
+
+`config.py` is gitignored and holds the bot token; checkout never touches it.
 
 ## Scripts
 
