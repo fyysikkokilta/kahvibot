@@ -117,7 +117,12 @@ class ServiceConfig:
     filter_enabled: bool = False
     filter_particles: int = 800
     calibration_path: str = ""
-    # plug power over MQTT; the broker already carries it, so nothing reads a file
+    # filter state older than this is not resumed after a restart
+    filter_resume_max_age_s: float = 1800.0
+    filter_save_every_s: float = 300.0
+    # plug power over MQTT; the broker already carries it, so nothing reads a
+    # file. With power on, every message is also stored and brews are tracked.
+    power_enabled: bool = False
     mqtt_host: str = "127.0.0.1"
     mqtt_port: int = 1883
     mqtt_user: str = ""
@@ -177,22 +182,30 @@ class ReaderService:
         # particle, because it has no sensor and sampling it would waste them.
         self.filters = {}
         self.power = None
+        if cfg.power_enabled or cfg.filter_enabled:
+            self.power = PowerBus(cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user,
+                                  cfg.mqtt_password, cfg.mqtt_base_topic,
+                                  cfg.power_devices, clock=clock,
+                                  sink=store if cfg.power_enabled else None)
+            try:
+                self.power.seed(store.power_since(clock.wall() - self.power.history_s))
+            except Exception:  # noqa: BLE001
+                log.warning("could not reload recent power", exc_info=True)
+            if not self.power.start():
+                self.power = None
         if cfg.filter_enabled:
             try:
                 cal = RbpfCalibration(cfg.calibration_path)
                 self.filters = {s: PotRBPF(cal, n_particles=cfg.filter_particles, seed=i)
                                 for i, s in enumerate(("left", "right"))}
-                self.power = PowerBus(cfg.mqtt_host, cfg.mqtt_port, cfg.mqtt_user,
-                                      cfg.mqtt_password, cfg.mqtt_base_topic,
-                                      cfg.power_devices, clock=clock)
-                if not self.power.start():
-                    self.power = None
+                self._resume_filters()
                 log.info("(volume, temperature) filter on: %d particles/pot, plug power %s",
                          cfg.filter_particles,
                          "over mqtt" if self.power is not None else "unavailable")
             except Exception:  # noqa: BLE001 - a missing filter must not stop the reader
                 log.warning("filter unavailable; readings stay unfiltered", exc_info=True)
                 self.filters = {}
+        self.filter_saved_mono = clock.mono()
         self.filter_mono = None
         # The recent graph needs no graphs module; the day graph is only a
         # fallback, so the cache is built either way.
@@ -311,6 +324,25 @@ class ReaderService:
             p.pop("rowdist", None)          # never goes in the log: 3x256 floats per pot
         _ = seen
 
+    def _resume_filters(self) -> None:
+        """Pick the posterior up where the last run left it, if it is recent."""
+        now = self.clock.wall()
+        for side, (t, blob) in self.store.load_filters().items():
+            filt = self.filters.get(side)
+            if filt is None or now - t > self.cfg.filter_resume_max_age_s:
+                continue
+            if filt.load_bytes(blob):
+                log.info("%s filter resumed from %.0f s ago", side, now - t)
+
+    def save_filters(self) -> None:
+        now = self.clock.wall()
+        for side, filt in self.filters.items():
+            try:
+                self.store.save_filter(side, now, filt.state_bytes())
+            except Exception:  # noqa: BLE001
+                log.warning("could not save the %s filter", side, exc_info=True)
+        self.filter_saved_mono = self.clock.mono()
+
     def _record(self, frame: Frame, luma: float, pots, src: str, tta: int) -> dict:
         rec = {"t": iso_utc(frame.captured_wall), "seq": self.seq, "src": src,
                "luma": round(luma, 1), "pots": slim(pots)}
@@ -379,6 +411,8 @@ class ReaderService:
             self.tick()
             self.last_tick_mono = self.clock.mono()
             self.store.flush()
+            if self.filters and self.clock.mono() - self.filter_saved_mono >= self.cfg.filter_save_every_s:
+                self.save_filters()
             now = self.clock.mono()
             target = start + self.cadence()
             self.next_tick_mono = target if target > now else now + self.cadence()

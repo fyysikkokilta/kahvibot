@@ -25,8 +25,9 @@ Twelve days of kahviraspi (2026-08-29 → 09-09):
 One resident process, `ReaderService`, owns the camera and the model:
 
 ```
- kahvibot ──/run/kahvi-sampler/ipc.sock──▶ ReaderService ──▶ readings-%Y-%m.jsonl
-   │  {"op":"frame","max_age":15}            │  tick every 10 s          latest.json
+ kahvibot ──/run/kahvi-sampler/ipc.sock──▶ ReaderService ──▶ kahvi.db (SQLite, WAL)
+   │  {"op":"frame","max_age":15}            │  tick every 10 s          readings, power,
+   │                                         │  plugs over MQTT          brews, filter state
    │  {"op":"graph"}                         │  capture → luma → detect/6 → read TTA=1
    │  {"op":"ping"}                          │  requests served between ticks
    └─ fallback: fswebcam, no reading         └─ graph rendered from the in-memory day
@@ -117,10 +118,11 @@ Live on kahviraspi since 2026-09-15.
 
 1. On the Pi, from a checkout of this repo: `bash reader/install_reader.sh`. It
    builds a virtualenv beside the code, writes the unit with this checkout's
-   paths, stops `kahvisampler` and starts `kahvi-reader`. The reader runs from
-   the checkout; only data (readings, `latest.json`) lives outside it.
-2. In the bot's `config.py`: `reader_service_socket = "/run/kahvi-sampler/ipc.sock"`,
-   and point `coffee_reader_log` at the same data directory. Restart kahvibot.
+   paths, retires the old `kahvi-power` and `kahvisampler` units, imports the
+   older JSONL/CSV files into `kahvi.db` on first install, and starts
+   `kahvi-reader`. The reader runs from the checkout; only data lives outside it.
+2. In the bot's `config.py`: `reader_service_socket = "/run/kahvi-sampler/ipc.sock"`
+   and `coffee_db = "/home/konsta/coffee-data/kahvi.db"`. Restart kahvibot.
    Without that line the bot behaves exactly as before.
 3. Plug power arrives over MQTT; the installer copies the broker password to a
    file the service user can read. With no broker the filter still runs, it just

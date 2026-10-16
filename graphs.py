@@ -16,16 +16,15 @@ short version that constrains this file:
     as an instant (§3.2);
   * hand-drawn Pillow, no matplotlib (§4.1); geometry fixed at 1000×640 (§6.2).
 
-Everything here is pure: no telegram imports, no config imports. The bot calls
-graph_reply() and sends whatever comes back. Any exception is the caller's to
-catch and degrade to text — a broken graph must never take out /status.
+Everything here is pure: no telegram imports, no config imports, no file
+reading. The reader service (reader/pipeline/graphing.py) builds the day's
+records from its store and calls DaySeries, render_day_graph and build_caption.
+Any exception is the caller's to catch and degrade to text.
 """
 
 import io
-import json
 import os
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from datetime import timedelta
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -56,122 +55,6 @@ BREW = "#2ca02c"
 FI_WEEKDAYS = ["ma", "ti", "ke", "to", "pe", "la", "su"]
 
 # single-entry render cache (§4.3)
-_cache = {"key": None, "png": None, "caption": None}
-
-
-# ---------------------------------------------------------------------------
-# data plumbing (§7)
-# ---------------------------------------------------------------------------
-
-def _parse_ts(s):
-    # records are UTC ISO-8601; tolerate a trailing Z
-    try:
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except (ValueError, TypeError, AttributeError):
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
-
-
-def _record_time(rec):
-    # §7.1: captured_at, falling back to read_at. Never the file stem.
-    # "t" is the 10 s sampler's slim-record timestamp.
-    return (_parse_ts(rec.get("captured_at")) or _parse_ts(rec.get("read_at"))
-            or _parse_ts(rec.get("t")))
-
-
-def _normalize(rec):
-    """Widen the 10 s sampler's slim records ({"t":..., "pots":[{"s","ok","ml",
-    "h","e","d"}]}, abbreviated to keep its ~1.4 MB/day budget) to the bot's
-    field names, so the rest of the module sees a single schema."""
-    pots = rec.get("pots")
-    if isinstance(pots, list):
-        for p in pots:
-            if isinstance(p, dict) and "side" not in p and "s" in p:
-                p["side"] = p.get("s")
-                p["volume_ml"] = p.get("ml")
-    return rec
-
-
-def _tail_lines(path, cutoff_utc, chunk=256 * 1024, max_bytes=32 * 1024 * 1024):
-    """Read whole lines from the end of the log until the first full line is
-    older than cutoff_utc (or the file/byte budget is exhausted).
-
-    GRAPHS.md §7.3 sizes the tail at 256 KB for user-driven photos; the 10 s
-    sampler makes the same file ~40x denser, so the tail grows in 256 KB steps
-    instead of being fixed — bounded work either way."""
-    with open(path, "rb") as fh:
-        fh.seek(0, os.SEEK_END)
-        size = fh.tell()
-        take = min(chunk, size)
-        while True:
-            fh.seek(size - take)
-            blob = fh.read(take)
-            lines = blob.split(b"\n")
-            # first element may be a partial line unless we read the whole file
-            head = 1 if take < size else 0
-            first_full = None
-            for ln in lines[head:]:
-                if ln.strip():
-                    first_full = ln
-                    break
-            if take >= size or take >= max_bytes:
-                break
-            if first_full is not None:
-                try:
-                    t = _record_time(json.loads(first_full))
-                except (ValueError, UnicodeDecodeError):
-                    t = None
-                if t is not None and t < cutoff_utc:
-                    break
-            take = min(size, max_bytes, take + chunk)
-        out = []
-        for ln in lines[head:]:
-            ln = ln.strip()
-            if ln:
-                try:
-                    out.append(ln.decode("utf-8"))
-                except UnicodeDecodeError:
-                    pass
-        return out
-
-
-def load_today(log_pattern, now_utc):
-    """Parse today's (local calendar day, §7.4) records from the current log
-    file. Returns a list of dicts each with '_t' (aware UTC datetime) added,
-    sorted by time. Unparseable lines are skipped; records without pots are
-    kept (they are failed captures and count as photos, §7.2)."""
-    now_local = now_utc.astimezone()
-    # the bot expands the pattern with LOCAL now at write time; a today-record
-    # was by definition written today local, so one file holds them all
-    path = now_local.strftime(log_pattern)
-    if not os.path.isfile(path):
-        return []
-    day_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    cutoff_utc = day_start_local.astimezone(timezone.utc)
-    records = []
-    for line in _tail_lines(path, cutoff_utc):
-        try:
-            rec = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(rec, dict):
-            continue
-        if rec.get("src") == "sampler" and not rec.get("pots"):
-            continue   # sampler state ticks (dark backoff etc.): not photos
-        t = _record_time(rec)
-        if t is None:
-            continue
-        if t.astimezone().date() != now_local.date():
-            continue
-        rec = _normalize(rec)
-        rec["_t"] = t
-        records.append(rec)
-    records.sort(key=lambda r: r["_t"])
-    return records
-
-
 class DaySeries(object):
     """Everything the renderer and the caption need, precomputed."""
 
@@ -321,7 +204,6 @@ def build_caption(day):
     return fi + "\n\n" + en
 
 
-TEXT_DISABLED = "Kahvimittari ei ole käytössä. / The coffee reader is not enabled."
 
 TEXT_EMPTY = ("Tänään ei ole vielä otettu yhtään kuvaa. Kokeile /status.\n"
               "No photos taken yet today. Try /status.")
@@ -595,40 +477,3 @@ def render_day_graph(day, font_dir=None):
     buf = io.BytesIO()
     img.convert("RGB").save(buf, "PNG")
     return buf.getvalue()
-
-
-# ---------------------------------------------------------------------------
-# entry point
-# ---------------------------------------------------------------------------
-
-def graph_reply(log_pattern, now_utc=None, font_dir=None):
-    """Everything /graph needs: (png_bytes or None, caption/fallback text).
-
-    The caller wraps this in try/except and falls back to TEXT_FAILED —
-    the failure discipline is read_coffee_level()'s (§4.2)."""
-    if not log_pattern:
-        return None, TEXT_DISABLED
-    if now_utc is None:
-        now_utc = datetime.now(timezone.utc)
-    now_local = now_utc.astimezone()
-    path = now_local.strftime(log_pattern)
-    try:
-        stat = os.stat(path)
-        mtime = stat.st_mtime
-    except OSError:
-        return None, TEXT_EMPTY
-
-    records = load_today(log_pattern, now_utc)
-    if not records:
-        return None, TEXT_EMPTY
-    day = DaySeries(records, now_utc)
-    if not day.enough_for_graph():
-        return None, _text_not_enough(day.n_readable)
-
-    key = (path, now_local.date().isoformat(), mtime, len(records))
-    if _cache["key"] == key:                                       # §4.3
-        return _cache["png"], _cache["caption"]
-    png = render_day_graph(day, font_dir=font_dir)
-    caption = build_caption(day)
-    _cache.update(key=key, png=png, caption=caption)
-    return png, caption

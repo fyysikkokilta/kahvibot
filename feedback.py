@@ -480,7 +480,7 @@ class FeedbackManager:
                 return None
             return cls(
                 enabled=True,
-                survey_dir=g("coffee_survey_dir", "/home/konsta/coffee-reader/survey"),
+                survey_dir=g("coffee_survey_dir", "/home/konsta/coffee-data/survey"),
                 bot_username=g("coffee_survey_bot_username", "TsufeBot"),
                 span=g("coffee_survey_span", {}),
                 span_source=g("coffee_survey_span_source", "per_side_const_v1"),
@@ -492,7 +492,7 @@ class FeedbackManager:
                 frames_dir=g("coffee_survey_frames_dir", ""),
                 sentinel_dir=g("coffee_survey_sentinel_dir", ""),
                 admin_chat=g("coffee_survey_admin_chat", 0),
-                reader_dir=g("coffee_survey_reader_dir", "/home/konsta/coffee-reader"),
+                reader_dir=g("coffee_survey_reader_dir", "/home/marci/dev/kiltiskahvi/reader/models"),
                 reader_version=g("coffee_survey_reader_version", ""),
             )
         except Exception:

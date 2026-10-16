@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kahvibot"
 version = "0.3.0"
-description = "Coffee measurement for the Guild of Physics guild room: Telegram bot, camera reader, and smart-plug power logging"
+description = "Coffee measurement for the Guild of Physics guild room: Telegram bot, camera reader with smart-plug power logging"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -27,14 +27,6 @@ reader = [
     "numpy>=1.23",
     "pillow>=9",
     "paho-mqtt>=2",
-]
-
-# The smart-plug logger and its own bot (power/).
-power = [
-    "paho-mqtt>=2",
-    "pandas>=1.5",
-    "matplotlib>=3.5",
-    "numpy>=1.23",
 ]
 
 # Fitting the density head on a frozen backbone (reader/training/). Needs torch,
@@ -63,10 +55,10 @@ include = ["reader*"]
 exclude = ["reader.training*"]
 
 [tool.pytest.ini_options]
-testpaths = ["test_triggers.py", "test_banner.py", "reader/pipeline", "power/tests"]
+testpaths = ["test_triggers.py", "test_banner.py", "reader/pipeline"]
 # Each component is deployed as a directory of scripts, not as an installed
 # package, so the suites import their neighbours by bare name. Putting those
 # directories on the path lets the whole repo be tested with one command
 # without rewriting imports that work in production.
-pythonpath = [".", "power", "reader"]
+pythonpath = [".", "reader"]
 addopts = "-q"

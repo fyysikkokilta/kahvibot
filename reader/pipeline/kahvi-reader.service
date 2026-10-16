@@ -5,7 +5,8 @@
 # outside it, so the checkout stays clean and `git status` stays meaningful.
 # Install with reader/install_reader.sh, which fills in the paths below.
 #
-# Replaces kahvisampler.service. Choices here trace to measurements:
+# It is also the plug power logger and the only writer of the SQLite store
+# (pipeline/store.py). Choices here trace to measurements:
 #   * CPUQuota 60 %: the old 25 % quota turned a 10 s sampler into a 33 s one.
 #   * reuse-max-age 30 s: ticks land ~20 s apart on this Pi, so a 15 s window
 #     sent most bot requests down the slow path.
@@ -42,7 +43,7 @@ WorkingDirectory=/home/marci/dev/kiltiskahvi/reader
 ExecStart=/home/marci/dev/kiltiskahvi/reader/venv/bin/python \
     /home/marci/dev/kiltiskahvi/reader/pipeline/run_daemon.py \
     --model-dir /home/marci/dev/kiltiskahvi/reader/models \
-    --log /home/konsta/coffee-data/readings-%%Y-%%m.jsonl \
+    --db /home/konsta/coffee-data/kahvi.db \
     --graphs /home/marci/dev/kiltiskahvi/graphs.py \
     --interval 10 --reuse-max-age 30 \
     --filter --mqtt-user zigbee2mqtt --mqtt-password-file /home/konsta/mqtt.pw \

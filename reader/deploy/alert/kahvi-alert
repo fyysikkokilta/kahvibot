@@ -36,7 +36,6 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
 from pathlib import Path
 
 CONF = Path("/etc/kahvi-alert.conf")
@@ -109,12 +108,18 @@ def pid_state(pid: str) -> str:
 
 
 def readings_age(cfg: dict):
-    pat = cfg.get("READINGS", "/home/konsta/coffee-data/readings-%Y-%m.jsonl")
-    p = Path(datetime.now().strftime(pat))
+    """Seconds since the newest stored reading, read-only from the store."""
+    import sqlite3
+    p = Path(cfg.get("DB", "/home/konsta/coffee-data/kahvi.db"))
     try:
-        return time.time() - p.stat().st_mtime, p
-    except OSError:
+        conn = sqlite3.connect("file:%s?mode=ro" % p, uri=True, timeout=5.0)
+        try:
+            (t,) = conn.execute("SELECT max(t) FROM readings").fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
         return None, p
+    return (None if t is None else time.time() - t), p
 
 
 # -- state (dedupe, and how long a condition has held) ------------------------

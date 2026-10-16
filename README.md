@@ -18,12 +18,11 @@ watermark can be added to the photos using
 | directory | what | runs where |
 |---|---|---|
 | `kahvibot`, `graphs.py`, `feedback.py`, `setup.py` | the Telegram bot: photo on "kahvi", `/graph`, annotation surveys, captions with the coffee level and the last brew | the Pi, as `kahvibot.service` |
-| `reader/` | the coffee level reader: `read_frame.py` (ONNX, numpy, Pillow), the resident reader service in `reader/pipeline/` that owns the camera and the model and serves the bot over a local socket, the deployed model bundle in `reader/models/`, and the deployment and supervision scripts in `reader/deploy/`. Design and deployment: `reader/PIPELINE.md`. The gym that produced the benchmarks lives in the research checkout, not here. | the Pi, as `kahvi-reader.service` (`reader/install_reader.sh`) |
-| `power/` | MQTT logger and bot for the smart plugs on the two coffee machines: brew detection from the heating element's power draw, cup estimate from brew duration, power plots. Merged from `luu3000/omatsufe`; README there | the Pi, beside the zigbee2mqtt broker |
+| `reader/` | the coffee level reader: `read_frame.py` (ONNX, numpy, Pillow), the resident reader service in `reader/pipeline/` that owns the camera and the model, serves the bot over a local socket, logs the smart plugs on the two coffee machines (brew detection from the heating element's power draw), and is the only writer of the SQLite store `kahvi.db`, the deployed model bundle in `reader/models/`, and the deployment and supervision scripts in `reader/deploy/`. Design and deployment: `reader/PIPELINE.md`. The gym that produced the benchmarks lives in the research checkout, not here. | the Pi, as `kahvi-reader.service` (`reader/install_reader.sh`) |
 
 The bot degrades gracefully in every direction: without the reader service it takes
-its own photo, without the reader it sends a photo with no caption, without the power
-logger it says nothing about brews.
+its own photo, without the reader it sends a photo with no caption, without the store
+it says nothing about brews.
 
 ## Usage
 ### Setup
