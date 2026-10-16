@@ -110,7 +110,8 @@ def test_import_is_idempotent_and_export_matches(tmp_path):
     jsonl = tmp_path / "readings.jsonl"
     jsonl.write_text("\n".join(json.dumps(_rec(T0 + i, i)) for i in range(3)) + "\n{trunc", encoding="utf-8")
     csvp = tmp_path / "power_vasen.csv"
-    csvp.write_text("timestamp,power\n2026-10-16T08:13:53+00:00,1604.0\n2026-10-16T08:17:29+00:00,0.0\n")
+    csvp.write_text("timestamp,power\n2026-10-16T08:13:53+00:00,1604.0\n\0\0\0"   # NULs: a power cut
+                    "2026-10-16T08:17:29+00:00,0.0\n")
     brews = tmp_path / "brews_vasen.jsonl"
     brews.write_text(json.dumps({"event": "start", "t": "2026-10-16T08:13:53+00:00", "power": 1604.0}) + "\n"
                      + json.dumps({"event": "end", "start": "2026-10-16T08:13:53+00:00",

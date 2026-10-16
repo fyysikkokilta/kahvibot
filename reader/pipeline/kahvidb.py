@@ -66,8 +66,9 @@ def import_readings(conn, paths) -> int:
 def import_power(conn, device, path) -> int:
     seen = {t for (t,) in conn.execute("SELECT t FROM power WHERE device = ?", (device,))}
     rows = []
-    with open(path, newline="", encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
+    with open(path, newline="", encoding="utf-8", errors="replace") as fh:
+        # a power cut leaves NUL runs in an appended file, which csv refuses
+        for row in csv.DictReader(line.replace(chr(0), "") for line in fh):
             try:
                 t, w = epoch_of(row["timestamp"]), float(row["power"])
             except (ValueError, KeyError, TypeError):
