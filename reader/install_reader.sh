@@ -73,9 +73,11 @@ if [ ! -f "$DB" ]; then
     shopt -s nullglob
     jsonl=("$DATA"/readings-*.jsonl)
     [ ${#jsonl[@]} -gt 0 ] && "${KDB[@]}" import-readings "$DB" "${jsonl[@]}"
-    for dev in vasen oikea; do
-        [ -f "$OLD_POWER/power_$dev.csv" ] && "${KDB[@]}" import-power "$DB" "$dev" "$OLD_POWER/power_$dev.csv"
-        [ -f "$OLD_POWER/brews_$dev.jsonl" ] && "${KDB[@]}" import-brews "$DB" "$dev" "$OLD_POWER/brews_$dev.jsonl"
+    # the old logger named the plugs vasen/oikea; vasen is the WEST machine
+    for pair in vasen:west oikea:east; do
+        old="${pair%%:*}" dev="${pair##*:}"
+        [ -f "$OLD_POWER/power_$old.csv" ] && "${KDB[@]}" import-power "$DB" "$dev" "$OLD_POWER/power_$old.csv"
+        [ -f "$OLD_POWER/brews_$old.jsonl" ] && "${KDB[@]}" import-brews "$DB" "$dev" "$OLD_POWER/brews_$old.jsonl"
     done
     "${KDB[@]}" stats "$DB"
 fi

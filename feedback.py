@@ -224,7 +224,7 @@ HELP_EXTRA = (
     "/eikiitos - Älä kysy minulta enää / Stop asking me"
 )
 
-POT_NAMES = {"left": "Vasen pannu / left pot", "right": "Oikea pannu / right pot"}
+POT_NAMES = {"left": "Itäinen pannu / east pot", "right": "Läntinen pannu / west pot"}
 
 
 def _cups_phrase(ml: float, fi: bool) -> str:

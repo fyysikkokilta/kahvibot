@@ -183,7 +183,7 @@ def _brew_phrase(day, fi):
 
 def _pots_phrase(day, fi):
     parts = []
-    for side, fi_name, en_name in (("left", "vasen", "left"), ("right", "oikea", "right")):
+    for side, fi_name, en_name in (("left", "itäinen", "east"), ("right", "läntinen", "west")):
         u = day.usable[side]
         name = fi_name if fi else en_name
         if not u:
@@ -454,8 +454,8 @@ def render_day_graph(day, font_dir=None):
 
     # row 1: what the lines are; row 2: what the marks are
     lx = 24
-    for side, label in (("left", "vasen pannu / left pot"),
-                        ("right", "oikea pannu / right pot")):
+    for side, label in (("left", "itäinen pannu / east pot"),
+                        ("right", "läntinen pannu / west pot")):
         draw.rectangle([lx, 578, lx + 22, 588], fill=COLOURS[side])
         suffix = "" if day.usable[side] else " (ei lukemia / no readings)"
         tw = _text(draw, (lx + 30, 588), label + suffix, fonts["body"], TEXT_BODY)
