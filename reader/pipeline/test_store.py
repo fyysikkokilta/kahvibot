@@ -47,14 +47,14 @@ def test_readings_are_batched_until_the_flush_interval():
 
 def test_brew_event_forces_the_next_flush():
     store, clock, tmp = _store()
-    store.add_brew("vasen", {"event": "start", "start": T0, "peak_w": 1450.0})
+    store.add_brew("west", {"event": "start", "start": T0, "peak_w": 1450.0})
     assert store.flush()                              # urgent: no interval wait
     ro = connect(tmp / "kahvi.db", readonly=True)
-    assert last_brew(ro, "vasen") == (T0, None)       # running
-    store.add_brew("vasen", {"event": "end", "start": T0, "end": T0 + 240,
+    assert last_brew(ro, "west") == (T0, None)       # running
+    store.add_brew("west", {"event": "end", "start": T0, "end": T0 + 240,
                              "duration_s": 240.0, "peak_w": 1500.0})
     store.flush()
-    assert last_brew(ro, "vasen") == (T0, T0 + 240)
+    assert last_brew(ro, "west") == (T0, T0 + 240)
 
 
 def test_brew_tracker_hysteresis():
@@ -68,17 +68,17 @@ def test_brew_tracker_hysteresis():
 
 def test_power_bus_logs_messages_and_brews_into_the_store():
     store, clock, tmp = _store()
-    bus = PowerBus(devices={"left": "vasen"}, sink=store)
+    bus = PowerBus(devices={"left": "west"}, sink=store)
     for w in (80.0, 1450.0, 1460.0, 82.0):
-        bus._on_message(None, None, SimpleNamespace(topic="zigbee2mqtt/vasen",
+        bus._on_message(None, None, SimpleNamespace(topic="zigbee2mqtt/west",
                                                     payload=json.dumps({"power": w}).encode()))
     bus._on_message(None, None, SimpleNamespace(topic="zigbee2mqtt/other", payload=b'{"power": 5}'))
     store.flush(force=True)
     assert [w for _, _, w in store.power_since(0)] == [80.0, 1450.0, 1460.0, 82.0]
-    start, end = last_brew(connect(tmp / "kahvi.db", readonly=True), "vasen")
+    start, end = last_brew(connect(tmp / "kahvi.db", readonly=True), "west")
     assert end is not None and end >= start
     # a restart refills the graph's power strip from the store
-    bus2 = PowerBus(devices={"left": "vasen"})
+    bus2 = PowerBus(devices={"left": "west"})
     bus2.seed(store.power_since(0))
     assert len(bus2.history("left", since_wall=0)) == 4
 
@@ -120,10 +120,10 @@ def test_import_is_idempotent_and_export_matches(tmp_path):
     conn = connect(tmp_path / "k.db")
     assert kahvidb.import_readings(conn, [jsonl]) == 3
     assert kahvidb.import_readings(conn, [jsonl]) == 0
-    assert kahvidb.import_power(conn, "vasen", csvp) == 2
-    assert kahvidb.import_power(conn, "vasen", csvp) == 0
-    assert kahvidb.import_brews(conn, "vasen", brews) == 1
-    assert kahvidb.import_brews(conn, "vasen", brews) == 0
+    assert kahvidb.import_power(conn, "west", csvp) == 2
+    assert kahvidb.import_power(conn, "west", csvp) == 0
+    assert kahvidb.import_brews(conn, "west", brews) == 1
+    assert kahvidb.import_brews(conn, "west", brews) == 0
     out = io.StringIO()
     assert kahvidb.export_readings(conn, 0, out) == 3
     assert [json.loads(l)["seq"] for l in out.getvalue().splitlines()] == [0, 1, 2]

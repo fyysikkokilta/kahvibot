@@ -1,8 +1,8 @@
 """Import into and export from the store (store.py).
 
   python -m pipeline.kahvidb import-readings DB readings-2026-09.jsonl ...
-  python -m pipeline.kahvidb import-power   DB vasen power_vasen.csv
-  python -m pipeline.kahvidb import-brews   DB vasen brews_vasen.jsonl
+  python -m pipeline.kahvidb import-power   DB west power_vasen.csv
+  python -m pipeline.kahvidb import-brews   DB west brews_vasen.jsonl
   python -m pipeline.kahvidb export-readings DB [--since 2026-10-01] > readings.jsonl
   python -m pipeline.kahvidb export-power    DB [--since ...]        > power.csv
   python -m pipeline.kahvidb export-brews    DB                      > brews.csv

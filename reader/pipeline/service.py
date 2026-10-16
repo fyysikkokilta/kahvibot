@@ -128,7 +128,10 @@ class ServiceConfig:
     mqtt_user: str = ""
     mqtt_password: str = ""
     mqtt_base_topic: str = "zigbee2mqtt"
-    power_devices: dict = field(default_factory=lambda: {"left": "vasen", "right": "oikea"})
+    # camera side -> plug. The camera faces the machines from the opposite side
+    # to a person, so camera-left is the EAST machine (the banner's names).
+    # Verified from data: each plug's brews raise that pot's camera level.
+    power_devices: dict = field(default_factory=lambda: {"left": "east", "right": "west"})
     full_ml: float = 1250.0
 
 

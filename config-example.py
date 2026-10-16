@@ -70,7 +70,7 @@ reader_service_timeout = 3.0          # seconds before falling back to the camer
 # The reader service logs the plugs and their brews into coffee_db. With
 # coffee_db set, photo captions get a "keitetty 12 min sitten / brewed 12 min
 # ago" line per pot (or "brewing now").
-power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
+power_devices = {"left": "east", "right": "west"}   # camera side -> plug name (camera-left = EAST)
 
 # Caption text on replies the whole group sees (photo readings, "last brewed",
 # the survey invitation, the graph caption). False = pictures only, which is

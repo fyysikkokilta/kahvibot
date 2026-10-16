@@ -91,7 +91,7 @@ reader_service_max_age = getattr(_config, "reader_service_max_age", 15.0)
 reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
 # Coffee-machine power plugs: the reader service records brews in coffee_db,
 # and the caption gets a "last brewed" line per pot from them.
-power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oikea"})
+power_devices = getattr(_config, "power_devices", {"left": "east", "right": "west"})
 # Caption text on replies the whole group sees. Off during burn-in: the photo
 # and the graph go out bare, while the survey button still appears, so people
 # can still annotate without the bot narrating numbers it is not yet sure of.
@@ -273,7 +273,10 @@ def _service_frame():
 
 
 # Display names for the two camera-frame sides.
-POT_NAMES = {"left": "vasen pannu / left pot", "right": "oikea pannu / right pot"}
+# Compass names, matching the photo banner (banner.py): camera-left is the
+# EAST machine. "left"/"right" stay as the keys because they are positions in
+# the camera frame, which is what the reader and the survey work in.
+POT_NAMES = {"left": "itäinen pannu / east pot", "right": "läntinen pannu / west pot"}
 
 
 def _ago(seconds: float) -> str:
