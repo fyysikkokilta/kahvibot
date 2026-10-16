@@ -134,7 +134,7 @@ Is something wrong? Do you have a feature request? Contact the administrator {0}
 """
 
 
-def _load_watermark(path) -> Optional[Image]:
+def _load_watermark(path):
     """The watermark image, or None. A missing or unreadable file costs the
     watermark, not the bot: the images are not in git (sponsor artwork), so a
     fresh checkout used to crash on start with FileNotFoundError."""
