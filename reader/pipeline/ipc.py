@@ -248,4 +248,6 @@ def serve_forever(service, addr, poll_s: float = 0.25, heartbeat=None):
                 heartbeat()
     finally:
         server.stop.set()
+        if service.filters:
+            service.save_filters()
         service.store.flush(force=True)

@@ -12,7 +12,7 @@ Modules:
   camera    Frame, FswebcamCamera (the Pi's fswebcam under a flock)
   reader    WarmReader: model loaded once, cached boxes, per-call TTA
   gate      entropy tiers
-  store     single-writer JSONL with monthly rotation + latest.json sidecar
+  store     the single-writer SQLite store (readings, power, brews, filter state)
   graphing  day buffer + graph cache keyed on the last usable reading
   service   ReaderService: sampling loop + request handling
   ipc       socket server/client (AF_UNIX on the Pi, loopback TCP elsewhere)

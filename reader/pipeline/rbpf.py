@@ -225,6 +225,37 @@ class PotRBPF:
         self._since_brew: float | None = None
         self._last_observed = False
 
+    # -- persistence -------------------------------------------------------
+    _ARRAYS = ("v", "q", "mode", "logw", "t_mean", "t_var")
+
+    def state_bytes(self) -> bytes:
+        """The particle cloud as an .npz blob, so a restart resumes the
+        posterior instead of starting over from a uniform prior."""
+        import io
+        buf = io.BytesIO()
+        since = -1.0 if self._since_brew is None else float(self._since_brew)
+        np.savez_compressed(buf, since_brew=np.float64(since), brewing=np.bool_(self.brewing),
+                            **{k: getattr(self, k) for k in self._ARRAYS})
+        return buf.getvalue()
+
+    def load_bytes(self, blob: bytes) -> bool:
+        """Restore state_bytes() output. False (and nothing changed) when the
+        blob does not fit this filter, e.g. after a particle-count change."""
+        import io
+        try:
+            with np.load(io.BytesIO(blob)) as z:
+                arrays = {k: z[k] for k in self._ARRAYS}
+                since, brewing = float(z["since_brew"]), bool(z["brewing"])
+        except (OSError, KeyError, ValueError):
+            return False
+        if any(a.shape != (self.n,) for a in arrays.values()):
+            return False
+        for k, a in arrays.items():
+            setattr(self, k, a)
+        self._since_brew = None if since < 0 else since
+        self.brewing = brewing
+        return True
+
     # -- weights -----------------------------------------------------------
     @property
     def w(self) -> np.ndarray:

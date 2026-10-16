@@ -22,30 +22,24 @@ watermark_path = ""
 
 
 # --- Coffee level reader (optional) -----------------------------------------
-# Runs a small ONNX model on each captured frame in a short-lived subprocess
-# and (optionally) captions the photo with the amount of coffee. Any failure
-# in the reader silently degrades to "no reading"; the photo always goes out.
-
-# Command that runs the reader; the frame path is appended. Empty = disabled.
-# e.g. ["/home/pi/coffee-reader/venv/bin/python", "/home/pi/coffee-reader/read_frame.py"]
-coffee_reader_cmd = []
-
-# Seconds to wait for the reader before giving up on this frame.
-coffee_reader_timeout = 30
+# The reader service (reader/pipeline, below) reads the coffee level from each
+# frame and stores it. Any failure in the reader silently degrades to "no
+# reading"; the photo always goes out.
 
 # Show readings to users. Keep False for the burn-in week: readings are still
-# written to coffee_reader_log, so drift can be caught before going visible.
+# stored, so drift can be caught before going visible.
 coffee_reader_show = False
 
-# JSONL file that every reading is appended to ("" disables logging).
-coffee_reader_log = "/home/pi/coffee-reader/readings.jsonl"
+# The reader service's SQLite store, opened read-only for the "last brewed"
+# caption line. "" = no such line.
+coffee_db = ""                        # e.g. "/home/konsta/coffee-data/kahvi.db"
 
 # Advisory camera lock shared with the background sampler ("" = no lock,
 # exactly today's behaviour). The sampler skips its tick while the bot holds
 # it; the bot waits at most 5 s and then takes the photo anyway.
 camera_lock = ""
 
-# Show /graph (today's coffee level curve). Needs coffee_reader_log data.
+# Show /graph (the coffee level curve). Drawn by the reader service.
 coffee_graph_enabled = False
 
 # Messages containing any of these get the graph instead of a photo. Matched
@@ -65,18 +59,17 @@ graph_trigger_words = [
 
 # --- Reader service (reader/pipeline, reader/PIPELINE.md) -------------------------
 # When set, the bot asks the resident reader service for its freshest frame and
-# reading instead of running fswebcam + a cold read_frame.py itself, and also
-# gets /graph from it. Any failure falls back to the local path above.
+# reading instead of running fswebcam itself, and gets /graph from it. Any
+# failure falls back to a plain fswebcam photo with no reading.
 # Path of the AF_UNIX socket (kahvi-reader.service), or a TCP port on a dev box.
 reader_service_socket = ""            # e.g. "/run/kahvi-sampler/ipc.sock"
 reader_service_max_age = 15.0         # reuse a service frame this many seconds old
 reader_service_timeout = 3.0          # seconds before falling back to the camera
 
-# --- Coffee-machine power plugs (power/, README there) -----------------------
-# Directory with the MQTT power logger's brews_<device>.jsonl event files.
-# When set, photo captions get a "keitetty 12 min sitten / brewed 12 min ago"
-# line per pot (or "brewing now"). "" = off.
-power_brews_dir = ""                  # e.g. "/home/konsta/kahvibot/power/data"
+# --- Coffee-machine power plugs ---------------------------------------------
+# The reader service logs the plugs and their brews into coffee_db. With
+# coffee_db set, photo captions get a "keitetty 12 min sitten / brewed 12 min
+# ago" line per pot (or "brewing now").
 power_devices = {"left": "vasen", "right": "oikea"}   # camera side -> plug name
 
 # Caption text on replies the whole group sees (photo readings, "last brewed",
@@ -98,8 +91,8 @@ photo_banner_font = ""      # e.g. a DejaVuSans-Bold.ttf path; blank = autodetec
 # --- Annotation surveys (feedback.py; UX_FEEDBACK.md) ---
 coffee_survey_enabled = False
 coffee_survey_bot_username = "TsufeBot"   # for t.me deep links, no @
-coffee_survey_dir = "/home/konsta/coffee-reader/survey"
-coffee_survey_reader_dir = "/home/konsta/coffee-reader"  # calibration.json (optional)
+coffee_survey_dir = "/home/konsta/coffee-data/survey"
+coffee_survey_reader_dir = "/home/marci/dev/kiltiskahvi/reader/models"  # calibration.json (optional)
 # Ladder span per side, FRAME pixels: median y_base/y_top of the desktop
 # annotations per side (n=98 left / 159 right, era hd2026). NEVER from
 # per-frame model output - that would anchor the ladder.
@@ -111,7 +104,7 @@ coffee_survey_blind_frac = 0.25   # fraction of prompts served from the blind po
 coffee_survey_daily_cap = 15      # global prompts/day
 coffee_survey_volunteer_cap = 5   # volunteered surveys/user/day
 coffee_survey_eval_day_salt = "coffee10-blind-v1"  # MUST match inject_hand_lines salt
-coffee_survey_frames_dir = ""     # sampler retained-frame ring (stem.jpg + stem.json)
+coffee_survey_frames_dir = ""     # blind pool of retained frames (stem.jpg + stem.json)
 coffee_survey_sentinel_dir = ""   # desktop-annotated frames + sentinel_lines.json
 coffee_survey_admin_chat = 0      # nightly tg_clicks gzip goes here; 0 = off
 

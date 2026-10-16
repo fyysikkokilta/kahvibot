@@ -116,11 +116,8 @@ echo "throttled bits: 0x1=under-volt now 0x40000=under-volt since boot"
 hr "memory / load"
 free -m 2>&1; uptime 2>&1
 
-hr "readings freshness"
-for d in /home/konsta/coffee-data /home/konsta/coffee-reader; do
-    f="$d/readings-$(date +%Y-%m).jsonl"
-    [ -f "$f" ] && { echo "$f: $(wc -l < "$f") lines, mtime $(date -r "$f" '+%F %T')"; tail -1 "$f" | cut -c1-160; }
-done
+hr "store freshness"
+cd /home/marci/dev/kiltiskahvi/reader && venv/bin/python -m pipeline.kahvidb stats /home/konsta/coffee-data/kahvi.db 2>&1
 
 hr "bot: how often it fell back today"
 sudo journalctl -u kahvibot --since today --no-pager 2>&1 | grep -c "reader service unavailable"

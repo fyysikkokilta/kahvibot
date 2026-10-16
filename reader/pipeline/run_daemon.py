@@ -1,13 +1,14 @@
-"""Pi entry point: python run_daemon.py --model-dir /home/konsta/coffee-reader ...
+"""Pi entry point: python run_daemon.py --model-dir reader/models --db kahvi.db ...
 
-Replaces sampler.py as kahvisampler.service's ExecStart. Same camera arguments,
-same log location; adds the IPC socket the bot talks to.
+The one process that owns the camera, the model, the plug subscription and the
+database (store.py). kahvi-reader.service runs it.
 """
 from __future__ import annotations
 
 import argparse
 import logging
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -40,7 +41,7 @@ def main(argv=None) -> int:
     here = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model-dir", default=str(here.parent))
-    ap.add_argument("--log", default=None, help="readings JSONL strftime pattern")
+    ap.add_argument("--db", default="/home/konsta/coffee-data/kahvi.db", help="SQLite store")
     ap.add_argument("--run-dir", default=os.environ.get("RUNTIME_DIRECTORY", "/run/kahvi-sampler"))
     ap.add_argument("--lock", default="/run/lock/kahvicam.lock")
     ap.add_argument("--socket", default=None, help="AF_UNIX path (default <run-dir>/ipc.sock) or TCP port")
@@ -67,13 +68,14 @@ def main(argv=None) -> int:
     ap.add_argument("--mqtt-password-file", default="",
                     help="file holding the broker password; never pass it on the command line")
     ap.add_argument("--mqtt-base-topic", default="zigbee2mqtt")
+    ap.add_argument("--no-power", action="store_true",
+                    help="do not subscribe to the plugs or log their power and brews")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s")
 
     model_dir = Path(a.model_dir)
     run_dir = Path(a.run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
-    log_pattern = a.log or str(model_dir / "readings-%Y-%m.jsonl")
     sock = a.socket or str(run_dir / "ipc.sock")
     if sock.isdigit():
         sock = int(sock)
@@ -81,10 +83,7 @@ def main(argv=None) -> int:
     clock = RealClock()
     camera = FswebcamCamera(clock, lock_path=a.lock, tmp_path=str(run_dir / "frame.jpg"))
     reader = WarmReader(model_dir, threads=a.threads)
-    # latest.json belongs beside the readings, not inside the model bundle: the
-    # bundle is a checkout of the repository and must stay clean.
-    store = ReadingsStore(log_pattern, clock,
-                          latest_path=str(Path(log_pattern).parent / "latest.json"))
+    store = ReadingsStore(a.db, clock)
     graphs_mod = None
     if a.graphs and Path(a.graphs).is_file():
         try:
@@ -95,6 +94,7 @@ def main(argv=None) -> int:
                         detect_every=a.detect_every, tta_probe_every=a.tta_probe_every,
                         reuse_max_age=a.reuse_max_age,
                         filter_enabled=a.filter, filter_particles=a.filter_particles,
+                        power_enabled=not a.no_power,
                         calibration_path=str(model_dir / "calibration.json"),
                         mqtt_host=a.mqtt_host, mqtt_port=a.mqtt_port,
                         mqtt_user=a.mqtt_user, mqtt_password=_read_secret(a.mqtt_password_file),
@@ -102,17 +102,20 @@ def main(argv=None) -> int:
     gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
                 agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
     svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)
-    # Recover today's readings from the log. Without this a restart or a power
-    # cut makes /graph answer "not enough readings yet" for an hour, even though
-    # the whole day is already on disk in the file this service wrote.
+    # Recover today's readings, so /graph has the day straight after a restart.
     try:
-        now = clock.wall()
-        seeded = svc.daybuf.seed_from_log(store.path_for(now), now)
+        seeded = svc.daybuf.seed(store, clock.wall())
         if seeded:
-            logging.getLogger("kahvi").info("recovered %d of today's readings from %s",
-                                            seeded, store.path_for(now))
+            logging.getLogger("kahvi").info("recovered %d of today's readings", seeded)
     except Exception:  # noqa: BLE001
         logging.getLogger("kahvi").warning("could not recover today's readings", exc_info=True)
+
+    # systemd stops the service with SIGTERM. Turn it into SystemExit so the
+    # loop's finally runs: the last batch of readings and the filter state are
+    # written instead of dropped.
+    def _term(signum, frame):
+        raise SystemExit(0)
+    signal.signal(signal.SIGTERM, _term)
     log = logging.getLogger("kahvi")
     log.info("reader service up: interval=%.0fs socket=%s gate=%s e<=%.2f/%.2f a<=%.0f/%.0f ml",
              a.interval, sock, a.gate_mode, a.gate_ok, a.gate_uncertain,

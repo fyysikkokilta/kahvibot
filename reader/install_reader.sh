@@ -8,13 +8,14 @@
 # something. It builds its own virtualenv beside the code, because the reader
 # needs onnxruntime and paho while the bot needs neither.
 #
-# Rollback:  sudo systemctl disable --now kahvi-reader
-#            sudo systemctl enable --now kahvisampler     # if the old unit is still installed
+# The service is also the plug power logger and the only writer of the SQLite
+# store, $DATA/kahvi.db. A first install imports whatever the older layout left
+# behind (readings JSONL, the power logger's CSVs and brews), once.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"          # .../kahvibot/reader
 BOT="$(cd "$HERE/.." && pwd)"                  # .../kahvibot
-DATA="${DATA:-/home/konsta/coffee-data}"       # readings and latest.json
+DATA="${DATA:-/home/konsta/coffee-data}"       # kahvi.db, survey/, frames/
 RUN_USER="${RUN_USER:-$(id -un)}"
 MQTT_USER="${MQTT_USER:-zigbee2mqtt}"
 MQTT_PW_FILE="${MQTT_PW_FILE:-$HOME/mqtt.pw}"
@@ -54,11 +55,32 @@ sed -e "s|/home/marci/dev/kiltiskahvi/reader|$HERE|g" \
     -e "s|^Group=.*|Group=$RUN_USER|" \
     "$HERE/pipeline/kahvi-reader.service" | sudo tee /etc/systemd/system/kahvi-reader.service >/dev/null
 
+# 5. One writer: the separate power logger is retired before the store opens.
+for old in kahvi-power kahvisampler; do
+    if [ -f "/etc/systemd/system/$old.service" ]; then
+        sudo systemctl disable --now "$old" 2>/dev/null || true
+        sudo rm -f "/etc/systemd/system/$old.service"
+    fi
+done
 sudo systemctl daemon-reload
-if systemctl is-enabled kahvisampler >/dev/null 2>&1; then
-    sudo systemctl disable --now kahvisampler        # the service replaces it
+
+# 6. First install of the store: import the older files, with the reader stopped.
+DB="$DATA/kahvi.db"
+OLD_POWER="${OLD_POWER:-$HOME/power/data}"
+if [ ! -f "$DB" ]; then
+    sudo systemctl stop kahvi-reader 2>/dev/null || true
+    KDB=(env -C "$HERE" venv/bin/python -m pipeline.kahvidb)
+    shopt -s nullglob
+    jsonl=("$DATA"/readings-*.jsonl)
+    [ ${#jsonl[@]} -gt 0 ] && "${KDB[@]}" import-readings "$DB" "${jsonl[@]}"
+    for dev in vasen oikea; do
+        [ -f "$OLD_POWER/power_$dev.csv" ] && "${KDB[@]}" import-power "$DB" "$dev" "$OLD_POWER/power_$dev.csv"
+        [ -f "$OLD_POWER/brews_$dev.jsonl" ] && "${KDB[@]}" import-brews "$DB" "$dev" "$OLD_POWER/brews_$dev.jsonl"
+    done
+    "${KDB[@]}" stats "$DB"
 fi
 sudo systemctl enable --now kahvi-reader
+sudo systemctl restart kahvi-reader
 
 sleep 5
 sudo systemctl status kahvi-reader --no-pager -n 12 || true
@@ -66,8 +88,8 @@ sudo systemctl status kahvi-reader --no-pager -n 12 || true
 echo
 echo "=== next ==="
 echo "  journalctl -u kahvi-reader -f                 # one line per state change"
-echo "  tail -f $DATA/readings-\$(date +%Y-%m).jsonl   # slim records: a, t_c, fm/flo/fhi"
+echo "  (cd $HERE && venv/bin/python -m pipeline.kahvidb stats $DATA/kahvi.db)"
 echo "  ls -l /run/kahvi-sampler/ipc.sock             # the bot's socket"
 echo "  bot config.py: reader_service_socket = \"/run/kahvi-sampler/ipc.sock\""
-echo "                 coffee_reader_log    = \"$DATA/readings-%Y-%m.jsonl\""
+echo "                 coffee_db            = \"$DATA/kahvi.db\""
 echo "  then: sudo systemctl restart kahvibot"

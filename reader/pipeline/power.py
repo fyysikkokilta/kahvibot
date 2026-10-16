@@ -16,6 +16,10 @@ brewing", would let the filter reject a genuine level rise.
 The wattage matters because it names the regime. The element draws ~1450 W and
 the hotplate 57-182 W (measured at the guild room), so a level rising while the
 element is idle is the sensor changing its mind, not coffee appearing.
+
+This is also the power logger. Every message goes to the store (a `sink`) and
+through a BrewTracker per plug, which is what the separate kahvi-power service
+used to do from a second MQTT subscription to the same topics.
 """
 from __future__ import annotations
 
@@ -27,6 +31,41 @@ import time
 
 log = logging.getLogger("kahvi.power")
 
+# The element draws ~1450 W and the hotplate 57-182 W, so a brew starts above
+# 300 W and ends below 250 W; the gap is the hysteresis that keeps one brew from
+# splitting in two when the reading wobbles.
+BREW_START_W = 300.0
+BREW_END_W = 250.0
+
+
+class BrewTracker:
+    """Brew start/end from a stream of (wall_seconds, watts).
+
+    update() returns an event at the two edges and None otherwise:
+      {"event": "start", "start": t, "peak_w": w}
+      {"event": "end", "start": t0, "end": t1, "duration_s": s, "peak_w": w}
+    """
+
+    def __init__(self, start_w: float = BREW_START_W, end_w: float = BREW_END_W):
+        self.start_w, self.end_w = float(start_w), float(end_w)
+        self.start = None
+        self.peak = 0.0
+
+    def update(self, wall: float, watts: float):
+        watts = float(watts)
+        if self.start is None:
+            if watts > self.start_w:
+                self.start, self.peak = wall, watts
+                return {"event": "start", "start": wall, "peak_w": watts}
+            return None
+        self.peak = max(self.peak, watts)
+        if watts < self.end_w:
+            ev = {"event": "end", "start": self.start, "end": wall,
+                  "duration_s": round(wall - self.start, 1), "peak_w": self.peak}
+            self.start, self.peak = None, 0.0
+            return ev
+        return None
+
 
 class PowerBus:
     """Last reported watts per side, kept current by an MQTT subscription."""
@@ -34,7 +73,7 @@ class PowerBus:
     def __init__(self, host: str = "127.0.0.1", port: int = 1883, user: str = "",
                  password: str = "", base_topic: str = "zigbee2mqtt",
                  devices: dict | None = None, max_age_s: float = 900.0, clock=None,
-                 history_s: float = 4 * 3600.0):
+                 history_s: float = 4 * 3600.0, sink=None):
         self.host, self.port = host, int(port)
         self.user, self.password = user, password
         self.base_topic = base_topic.rstrip("/")
@@ -51,6 +90,20 @@ class PowerBus:
         self._hist: dict = collections.defaultdict(lambda: collections.deque(maxlen=2000))
         self._client = None
         self.connected = False
+        # the store, when there is one: add_power(device, wall, watts) and
+        # add_brew(device, event)
+        self.sink = sink
+        self.trackers = {side: BrewTracker() for side in self.devices}
+
+    def seed(self, rows) -> None:
+        """Refill the graph's history from stored (device, wall, watts) rows,
+        so a restart does not blank the power strip."""
+        by_dev = {dev: side for side, dev in self.devices.items()}
+        with self._lock:
+            for dev, t, w in rows:
+                side = by_dev.get(dev)
+                if side is not None:
+                    self._hist[side].append((t, w))
 
     # -- lifecycle ---------------------------------------------------------
     def start(self) -> bool:
@@ -116,6 +169,16 @@ class PowerBus:
         with self._lock:
             self._watts[side] = (now, watts)
             self._hist[side].append((now, watts))
+        if self.sink is not None:
+            device = self.devices[side]
+            try:
+                self.sink.add_power(device, now, watts)
+                event = self.trackers[side].update(now, watts)
+                if event is not None:
+                    self.sink.add_brew(device, event)
+                    log.info("%s: brew %s", device, event["event"])
+            except Exception:  # noqa: BLE001 - paho's thread must survive a bad row
+                log.warning("power row not stored", exc_info=True)
 
     # -- reads -------------------------------------------------------------
     def watts(self, side: str):

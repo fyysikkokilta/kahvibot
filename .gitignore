@@ -98,10 +98,10 @@ ENV/
 db/dummy/
 db/dump/
 
-# runtime data of the power logger and the reader service
-power/data/
-reader/**/latest.json
-reader/**/readings-*.jsonl
+# runtime data of the reader service
+reader/**/*.db
+reader/**/*.db-wal
+reader/**/*.db-shm
 .pytest_cache/
 
 # Holds a personal Telegram chat id; copy the .example and fill it in locally.
@@ -110,3 +110,6 @@ reader/deploy/alert/kahvi-alert.conf
 
 # Supabase CLI scratch state, not project config
 supabase/.temp/
+
+# Sponsor artwork, not ours to publish; the bot runs without it (_load_watermark).
+watermarks/

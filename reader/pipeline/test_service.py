@@ -58,7 +58,7 @@ class FakeReader:
 def make(e=0.5, grey=120, dets=True, cfg=None, scale=10.0):
     clock = VirtualClock(1_800_000_000.0, scale=scale)
     tmp = Path(tempfile.mkdtemp())
-    store = ReadingsStore(str(tmp / "r-%Y-%m.jsonl"), clock, flush_sec=60, latest_path=str(tmp / "latest.json"))
+    store = ReadingsStore(tmp / "kahvi.db", clock, flush_sec=60)
     svc = ReaderService(FakeCamera(clock, grey), FakeReader(e, dets), store, clock, Gate(0.55, 0.62), cfg or ServiceConfig())
     return svc, clock, store
 
@@ -92,8 +92,8 @@ def test_request_reuses_fresh_frame_then_captures():
     assert not r2.reused and svc.stats.requests_captured == 1
     assert svc.stats.request_photo_latency[-1] == 2.0  # capture cost only (photo-first)
     assert svc.stats.request_reading_latency[-1] > 2.0
-    recs = [ln for ln in Path(store.path_for(clock.wall())).read_text().splitlines() if ln] if store.flush(force=True) or True else []
-    assert any('"src":"bot"' in ln for ln in Path(store.path_for(clock.wall())).read_text().splitlines())
+    store.flush(force=True)
+    assert any(r["src"] == "bot" for r in store.records_since(0))
 
 
 def test_blind_backoff_on_no_carafe_not_on_abstention():
@@ -125,5 +125,5 @@ def test_agreement_gate_uses_neighbour_then_falls_back():
     svc.run_due(until_mono=25)                                      # ticks at 0 and 10 and 20
     assert svc.last_lit.pots[0]["agree"] == 0.0                     # fake reader is constant
     assert svc.last_lit.pots[0]["tier"] == "ok"
-    line = Path(store.path_for(clock.wall())).read_text() if store.flush(force=True) else ""
-    assert '"a":0.0' in line
+    store.flush(force=True)
+    assert any(p.get("a") == 0.0 for r in store.records_since(0) for p in r.get("pots", []))

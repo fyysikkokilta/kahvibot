@@ -37,49 +37,17 @@ class DayBuffer:
         self.day = None
         self.records: list[dict] = []
 
-    def seed_from_log(self, path, wall: float, max_bytes: int = 8 * 1024 * 1024) -> int:
-        """Load today's records from the readings log.
+    def seed(self, store, wall: float) -> int:
+        """Load today's records from the store.
 
-        The service writes every reading to disk and then, on restart, behaved as
-        if the day had never happened: an empty buffer means /graph answers "not
-        enough readings yet" for an hour after any restart or power cut. Reading
-        back the tail of the file costs milliseconds and removes that hole.
-
-        Only the current local day is kept, matching add()'s contract. Malformed
-        lines are skipped rather than fatal: a truncated last line is the normal
-        result of a power loss, which is exactly when this path matters.
+        Without this a restart or a power cut makes /graph answer "not enough
+        readings yet" for an hour, although the whole day is already on disk.
+        Only the current local day is kept, matching add()'s contract.
         """
-        import json
-        import os
-
         day = datetime.fromtimestamp(wall).date()
-        self.day, self.records = day, []
-        try:
-            size = os.path.getsize(path)
-            with open(path, "rb") as fh:
-                if size > max_bytes:
-                    fh.seek(size - max_bytes)
-                    fh.readline()          # drop the partial line
-                blob = fh.read().decode("utf-8", "replace")
-        except OSError:
-            return 0
-        for line in blob.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            t = rec.get("t")
-            if not t or "pots" not in rec:
-                continue
-            try:
-                when = datetime.fromisoformat(t)
-            except ValueError:
-                continue
-            if when.astimezone().date() == day:
-                self.records.append(rec)
+        midnight = datetime.combine(day, datetime.min.time()).timestamp()
+        self.day = day
+        self.records = [r for r in store.records_since(midnight) if "pots" in r]
         return len(self.records)
 
     def add(self, rec: dict, wall: float) -> None:

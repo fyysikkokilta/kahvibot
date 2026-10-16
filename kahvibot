@@ -15,7 +15,6 @@ import subprocess
 
 import socket
 
-import os
 
 import re
 
@@ -58,25 +57,22 @@ from config import (
     trigger_words,
 )
 
-# Coffee level reader (optional, defaults keep the bot exactly as before).
-# The reader is a separate short-lived subprocess so that nothing about it -
-# a missing model file, a crash, an OOM - can take the bot down: any failure
-# just means this photo goes out without a reading, like every photo did
-# before the reader existed.
+# Coffee level reading (optional, defaults keep the bot exactly as before).
+# The reader service (reader/pipeline) does all the reading and writes the
+# database; the bot only asks it for a frame and reads the database. Nothing
+# about the reader - a missing model, a crash, an OOM - can take the bot down:
+# any failure just means this photo goes out without a reading.
 import config as _config
 import json
-from datetime import datetime, timezone
+import sqlite3
+import time
 
-# Command to run, e.g. ["/home/pi/coffee-reader/venv/bin/python",
-#                       "/home/pi/coffee-reader/read_frame.py"].
-# Empty list = reader disabled.
-coffee_reader_cmd = getattr(_config, "coffee_reader_cmd", [])
-coffee_reader_timeout = getattr(_config, "coffee_reader_timeout", 30)
 # Show the reading to users. Keep False for the burn-in period: readings are
 # still logged, so drift can be caught before anything is user-visible.
 coffee_reader_show = getattr(_config, "coffee_reader_show", False)
-# JSONL log of every reading (empty string disables logging).
-coffee_reader_log = getattr(_config, "coffee_reader_log", "")
+# The reader service's SQLite store (reader/pipeline/store.py), opened
+# read-only for the "last brewed" line. Empty string = no such line.
+coffee_db = getattr(_config, "coffee_db", "")
 # Advisory camera lock shared with the background sampler. Empty string
 # (the default) is byte-for-byte today's behaviour: no lock, no sampler.
 camera_lock = getattr(_config, "camera_lock", "")
@@ -89,14 +85,12 @@ graph_trigger_words = getattr(_config, "graph_trigger_words", DEFAULT_GRAPH_WORD
 # Reader service (reader/pipeline, reader/PIPELINE.md): the sampler daemon owns the
 # camera and the warm model, and hands the bot its freshest frame plus reading
 # over a local socket. Empty string (the default) = today's behaviour exactly.
-# Any error on this path falls back to the fswebcam + subprocess path below.
+# Any error on this path falls back to a plain fswebcam photo with no reading.
 reader_service_socket = getattr(_config, "reader_service_socket", "")
 reader_service_max_age = getattr(_config, "reader_service_max_age", 15.0)
 reader_service_timeout = getattr(_config, "reader_service_timeout", 3.0)
-# Coffee-machine power plugs (power/): the MQTT logger appends brew start/end
-# events to <power_brews_dir>/brews_<device>.jsonl; the caption gets a "last
-# brewed" line per pot from them. Empty string (the default) = no such line.
-power_brews_dir = getattr(_config, "power_brews_dir", "")
+# Coffee-machine power plugs: the reader service records brews in coffee_db,
+# and the caption gets a "last brewed" line per pot from them.
 power_devices = getattr(_config, "power_devices", {"left": "vasen", "right": "oikea"})
 # Caption text on replies the whole group sees. Off during burn-in: the photo
 # and the graph go out bare, while the survey button still appears, so people
@@ -140,6 +134,24 @@ Is something wrong? Do you have a feature request? Contact the administrator {0}
 """
 
 
+def _load_watermark(path):
+    """The watermark image, or None. A missing or unreadable file costs the
+    watermark, not the bot: the images are not in git (sponsor artwork), so a
+    fresh checkout used to crash on start with FileNotFoundError."""
+    if not path:  # don't add watermark if the path is empty
+        return None
+    try:
+        img = Image.open(path)
+        img.load()
+    except OSError:
+        logger.warning(f"Watermark {path} unavailable; sending photos without it", exc_info=True)
+        return None
+    logger.info(f"Using watermark {path}")
+    if img.size != camera_dimensions:
+        logger.warning(f"Warning: watermark size is different from camera size: {img.size} vs {camera_dimensions}")
+    return img
+
+
 class CustomBot(Bot):
     """
     Simple custom telegram bot class with some extra attributes.
@@ -159,19 +171,8 @@ class CustomBot(Bot):
         self.admin_username = admin_username
         self.help_text = HELP_TEXT_FMT.format(admin_username)
 
-        self.watermark: Optional[Image] = None
-        if watermark_path:  # don't add watermark if the path is empty
-            self.watermark = Image.open(watermark_path)
-            logger.info(f"Using watermark {watermark_path}")
-            if self.watermark.size != camera_dimensions:
-                logger.warning(f"Warning: watermark size is different from camera size: {self.watermark.size} vs {camera_dimensions}")
-
-        self.watermark_alt: Optional[Image] = None
-        if watermark_path_alt:  # don't add watermark if the path is empty
-            self.watermark_alt = Image.open(watermark_path_alt)
-            logger.info(f"Using watermark {watermark_path_alt}")
-            if self.watermark_alt.size != camera_dimensions:
-                logger.warning(f"Warning: watermark size is different from camera size: {self.watermark_alt.size} vs {camera_dimensions}")
+        self.watermark: Optional[Image] = _load_watermark(watermark_path)
+        self.watermark_alt: Optional[Image] = _load_watermark(watermark_path_alt)
 
 
 def send_help(update: Update, ctx: CallbackContext):
@@ -186,45 +187,6 @@ def start_router(update: Update, ctx: CallbackContext):
     if survey and survey.on_start(update, ctx):
         return
     send_help(update, ctx)
-
-
-def read_coffee_level(image_path: str) -> Optional[dict]:
-    """
-    Run the coffee level reader on the captured frame, if configured.
-
-    Returns the parsed reading record, or None. None is the *normal* answer
-    for any kind of trouble - reader not configured, subprocess died, timed
-    out, printed garbage - because the bot's product is the photo and a
-    missing number must never block it.
-    """
-    if not coffee_reader_cmd:
-        return None
-    record = None
-    try:
-        proc = subprocess.run(
-            list(coffee_reader_cmd) + [image_path],
-            capture_output=True, text=True, timeout=coffee_reader_timeout,
-        )
-        record = json.loads(proc.stdout.strip().splitlines()[-1])
-    except Exception:
-        logger.warning("coffee reader failed", exc_info=True)
-    # Log failures too, not just successes: the burn-in question is "what
-    # fraction of photos yields a reading", and a log that only sees successes
-    # cannot answer it. The log path is a strftime pattern, so a value like
-    # "readings-%Y-%m.jsonl" rotates monthly for free (a plain path, having no
-    # % codes, passes through strftime unchanged).
-    if coffee_reader_log:
-        entry = record if isinstance(record, dict) else {"error": "reader produced no JSON"}
-        entry.setdefault("captured_at",
-                         datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        try:
-            with open(datetime.now().strftime(coffee_reader_log), "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(entry) + "\n")
-        except OSError:
-            logger.warning("coffee reader log write failed", exc_info=True)
-    if not isinstance(record, dict) or "pots" not in record:
-        return None
-    return record
 
 
 def _reader_service_call(payload: dict):
@@ -324,41 +286,45 @@ def _ago(seconds: float) -> str:
     return f"{seconds // 86400} d"
 
 
-def _last_brew_event(device: str) -> Optional[dict]:
-    """Last line of the power logger's brews_<device>.jsonl, or None."""
-    path = os.path.join(power_brews_dir, f"brews_{device}.jsonl")
-    with open(path, "rb") as f:
-        f.seek(0, os.SEEK_END)
-        f.seek(max(0, f.tell() - 4096))
-        lines = [ln for ln in f.read().decode("utf-8", "replace").splitlines() if ln.strip()]
-    return json.loads(lines[-1]) if lines else None
+def _last_brew(conn, device: str):
+    """(start, end) epoch seconds of the newest brew, end None while brewing."""
+    return conn.execute("SELECT start, end FROM brews WHERE device = ? ORDER BY start DESC LIMIT 1",
+                        (device,)).fetchone()
 
 
 def brew_lines() -> str:
     """
-    "Last brewed" caption lines from the coffee-machine power plugs (power/,
-    README there), one per pot that has an event. Independent of the camera
+    "Last brewed" caption lines from the coffee-machine power plugs, one per
+    pot that has a brew. Independent of the camera
     reading. Any failure returns "": the photo never waits on the plugs.
     """
-    if not power_brews_dir:
+    if not coffee_db:
         return ""
-    now = datetime.now(timezone.utc)
+    now = time.time()
     out = []
-    for side, device in power_devices.items():
-        try:
-            ev = _last_brew_event(device)
-            if not ev:
-                continue
-            name = POT_NAMES.get(side, side)
-            if ev.get("event") == "start":
-                started = datetime.fromisoformat(ev["t"])
-                if (now - started).total_seconds() < 20 * 60:
-                    out.append(f"🫖 {name}: keittää nyt / brewing now")
-                continue
-            age = _ago((now - datetime.fromisoformat(ev["end"])).total_seconds())
-            out.append(f"🫖 {name}: keitetty {age} sitten / brewed {age} ago")
-        except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError):
-            logger.debug("no brew info for %s", device, exc_info=True)
+    try:
+        conn = sqlite3.connect(f"file:{coffee_db}?mode=ro", uri=True, timeout=2.0)
+    except sqlite3.Error:
+        logger.debug("coffee db unavailable", exc_info=True)
+        return ""
+    try:
+        for side, device in power_devices.items():
+            try:
+                row = _last_brew(conn, device)
+                if not row:
+                    continue
+                start, end = row
+                name = POT_NAMES.get(side, side)
+                if end is None:
+                    if now - start < 20 * 60:
+                        out.append(f"🫖 {name}: keittää nyt / brewing now")
+                    continue
+                age = _ago(now - end)
+                out.append(f"🫖 {name}: keitetty {age} sitten / brewed {age} ago")
+            except (sqlite3.Error, TypeError, ValueError):
+                logger.debug("no brew info for %s", device, exc_info=True)
+    finally:
+        conn.close()
     return "\n".join(out)
 
 
@@ -400,7 +366,7 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     With a reader service configured, the frame and its reading come from the
     service (a frame younger than reader_service_max_age is reused, otherwise
     the service captures one), and the service is the one that logs it. The
-    camera path below is the fallback and the default.
+    camera path below is the fallback: a photo with no reading.
     """
     got = _service_frame()
     if got is not None:
@@ -433,10 +399,10 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
         else:
             subprocess.run(cmd, check=True)
         img = Image.open(f.name)
-        reading = read_coffee_level(f.name)
+        img.load()
         with open(f.name, "rb") as fh:
             raw = fh.read()
-    return img, reading, raw
+    return img, None, raw
 
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
@@ -496,9 +462,9 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
 
 def send_graph(update: Update, ctx: CallbackContext):
     """
-    /graph - today's coffee level as a picture. The failure discipline is
-    read_coffee_level()'s: any exception degrades to a text reply, because a
-    broken graph must never take out the bot.
+    /graph - the coffee level as a picture, drawn by the reader service. Any
+    failure degrades to a text reply, because a broken graph must never take
+    out the bot.
     """
     msg = update.effective_message
     if msg is None:
@@ -507,14 +473,11 @@ def send_graph(update: Update, ctx: CallbackContext):
         return  # feature off: stay silent, same as any unknown command
     try:
         # The reader service keeps today's series in memory and caches the
-        # render on the last usable reading (PIPELINE.md); parsing the log
-        # here is the fallback.
+        # render on the last usable reading (PIPELINE.md).
         res = _reader_service_call({"op": "graph"})
-        if res and res[0].get("ok"):
-            png, caption = (res[1] or None), res[0].get("caption")
-        else:
-            import graphs
-            png, caption = graphs.graph_reply(coffee_reader_log)
+        if not (res and res[0].get("ok")):
+            raise RuntimeError("reader service has no graph")
+        png, caption = (res[1] or None), res[0].get("caption")
         if png is not None and not caption_text_enabled:
             caption = None          # the graph is the message; no narration
     except Exception:

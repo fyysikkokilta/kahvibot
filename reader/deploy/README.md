@@ -35,15 +35,32 @@ reachable from outside it. Each backs up what it replaces to
 | | |
 |---|---|
 | `00_diagnose.sh` | Read-only. Which unit is installed, where the daemon is blocked (per-thread `wchan`), the camera lock, a real IPC probe, throttling, readings freshness. Run this first. |
-| `10_deploy.sh` | `MODE=repair` restarts a wedged reader; `MODE=pipeline` ships this checkout and runs `install_reader.sh`. |
-| `20_deploy_watchdog.sh` | Ships `pipeline/` and patches the installed unit to `Type=notify`. Refuses to run if the live `ExecStart` does not point at the tree it is about to write into. |
 | `30_deploy_alert.sh` | Installs the Telegram escalation (below). |
-| `90_rollback.sh` | Restores the backed-up units. `FULL=1` stops the reader entirely, leaving the bot on its fswebcam path — degraded but working. |
 | `RUNBOOK-2026-09-16.md` | The incident record: what was wrong, what was ruled out, and in what order. |
+
+A deploy is `git pull && bash reader/install_reader.sh` on the Pi. The one-off
+migration scripts of 2026-09-16 (`10_deploy.sh`, `20_deploy_watchdog.sh`,
+`90_rollback.sh`) are in git history.
+
+## Data
+
+Everything measured lives in one SQLite file, `/home/konsta/coffee-data/kahvi.db`,
+written only by `kahvi-reader` (`pipeline/store.py`): readings, plug power,
+brews, and the filter state that lets a restart resume the posterior. The bot
+and `kahvi-alert` open it read-only. `pipeline/kahvidb.py` imports the older
+JSONL/CSV formats and exports readings as the JSONL the gym replays:
+
+```sh
+cd reader && venv/bin/python -m pipeline.kahvidb stats /home/konsta/coffee-data/kahvi.db
+venv/bin/python -m pipeline.kahvidb export-readings /home/konsta/coffee-data/kahvi.db --since 2026-10-01 > readings.jsonl
+```
+
+The survey's own files (`survey/`, the bot's state and click log) and the blind
+pool of retained frames (`frames/`) sit beside it in `coffee-data/`.
 
 Every script verifies rather than trusting an exit code: that the watchdog is
 armed, that the IPC socket answers `{"op":"frame"}` with `ok=True`, that the
-readings file actually grows, and that the bot has stopped falling back.
+store actually grows, and that the bot has stopped falling back.
 
 ## Supervision
 
