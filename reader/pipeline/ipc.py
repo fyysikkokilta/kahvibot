@@ -158,11 +158,17 @@ class IPCServer(threading.Thread):
         if payload.get("op") != "frame":
             return None
         try:
-            lit = svc.last_lit                      # one atomic attribute read
-            if lit is None:
-                return None
             max_age = payload.get("max_age")
             max_age = svc.cfg.reuse_max_age if max_age is None else float(max_age)
+            if svc.darkgate.dark:
+                # A dark tick holds the loop for a capture, longer than the
+                # bot waits, so the dark frame has to be served from here too.
+                lit = svc.last_dark
+                max_age = max(max_age, svc.cfg.dark_reuse_max_age)
+            else:
+                lit = svc.last_lit                  # one atomic attribute read
+            if lit is None:
+                return None
             age = svc.clock.mono() - lit.frame.captured_mono
             if age > max_age:
                 return None
@@ -172,7 +178,7 @@ class IPCServer(threading.Thread):
             svc.stats.request_reading_latency.append(0.0)
             return ({"ok": True, "age": round(age, 2), "reused": True, "seq": lit.seq,
                      "pots": lit.pots, "captured_at": lit.frame.captured_wall,
-                     "fast": True},
+                     "dark": lit.dark, "fast": True},
                     lit.frame.jpeg)
         except Exception:  # noqa: BLE001 - fall back to the queue, never fail here
             return None
@@ -188,7 +194,7 @@ def execute(service, req: Request) -> None:
                 req.header = {"ok": False, "error": "capture failed"}
             else:
                 req.header = {"ok": True, "age": round(res.age_s, 2), "reused": res.reused,
-                              "seq": res.seq, "pots": res.pots,
+                              "seq": res.seq, "pots": res.pots, "dark": res.dark,
                               "captured_at": res.frame.captured_wall}
                 req.body = res.frame.jpeg
         elif op == "graph":

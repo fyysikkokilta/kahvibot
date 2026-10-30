@@ -108,6 +108,11 @@ class ServiceConfig:
     # how stale a held frame may be before it is worth making the caller
     # wait for a new capture instead
     stale_max_age: float = 90.0       # bot frames younger than this are reused
+    # In the dark the room does not change, and a fresh capture plus a model
+    # run takes longer than the bot waits (>5 s against its 3 s), so before
+    # the lights came on every request failed. A dark frame this young is
+    # reused instead; dark ticks come every dark_interval.
+    dark_reuse_max_age: float = 180.0
     request_tta: int = 1              # DELTA: no TTA in the request path
     flush_sec: float = 60.0
     graph_ttl_s: float = 600.0
@@ -155,6 +160,7 @@ class FrameResult:
     age_s: float
     reused: bool
     seq: int
+    dark: bool = False              # the room was dark: a photo, but no reading
 
 
 class ReaderService:
@@ -171,6 +177,7 @@ class ReaderService:
         self.last_ml: dict = {}
         self.prev_h: dict = {}          # side -> (mono, h) of the previous reading, for agreement
         self.last_lit: Optional[FrameResult] = None
+        self.last_dark: Optional[FrameResult] = None
         self.last_lit_tick_mono: Optional[float] = None
         self.next_tick_mono = clock.mono()
         # Liveness for the systemd watchdog: set after every tick that returns,
@@ -379,6 +386,7 @@ class ReaderService:
                    "state": "dark", "luma": round(luma, 1)}
             self.store.add(rec)
             self.daybuf.add(rec, fr.captured_wall)
+            self.last_dark = FrameResult(fr, [], 0.0, False, self.seq, dark=True)
             self.seq += 1
             return
         tta = 8 if (self.cfg.tta_probe_every and self.reading_n % self.cfg.tta_probe_every == 0) else 1
@@ -429,7 +437,14 @@ class ReaderService:
         self.stats.requests += 1
         t_req = self.clock.mono()
         max_age = self.cfg.reuse_max_age if max_age is None else max_age
-        if self.last_lit is not None:
+        if self.darkgate.dark and self.last_dark is not None:
+            age = self.clock.mono() - self.last_dark.frame.captured_mono
+            if age <= max(max_age, self.cfg.dark_reuse_max_age):
+                self.stats.requests_reused += 1
+                self.stats.request_photo_latency.append(0.0)
+                self.stats.request_reading_latency.append(0.0)
+                return FrameResult(self.last_dark.frame, [], age, True, self.last_dark.seq, dark=True)
+        if self.last_lit is not None and not self.darkgate.dark:
             age = self.clock.mono() - self.last_lit.frame.captured_mono
             if age <= max_age:
                 self.stats.requests_reused += 1
@@ -453,6 +468,11 @@ class ReaderService:
                 break
             self.clock.sleep(1.0)           # nothing usable in hand: keep trying
             fr = self._capture()
+        if fr is None and self.darkgate.dark and self.last_dark is not None:
+            # yesterday evening's lit frame would show coffee that is not there
+            age = self.clock.mono() - self.last_dark.frame.captured_mono
+            self.stats.requests_reused += 1
+            return FrameResult(self.last_dark.frame, [], age, True, self.last_dark.seq, dark=True)
         if fr is None:
             # The camera is busy - usually this service's own tick holds the
             # lock. Returning None sends the bot off to a cold fswebcam plus a
@@ -468,13 +488,18 @@ class ReaderService:
         self.stats.requests_captured += 1
         photo_ready = self.clock.mono()
         luma = fr.luma() or 0.0
-        pots = self._read(fr, self.cfg.request_tta, force_detect=False) or []
         seq = self.seq
-        if not self.darkgate.update(luma):
-            self._record(fr, luma, pots, "bot", self.cfg.request_tta)
-            self.last_lit = FrameResult(fr, pots, 0.0, False, seq)
-            # DELTA: a bot frame is a sample too; push the next tick out one interval
-            self.next_tick_mono = max(self.next_tick_mono, self.clock.mono() + self.cfg.interval)
+        if self.darkgate.update(luma):
+            # no model run on a dark frame: it finds nothing and costs seconds
+            self.last_dark = FrameResult(fr, [], 0.0, False, seq, dark=True)
+            self.stats.request_photo_latency.append(photo_ready - t_req)
+            self.stats.request_reading_latency.append(self.clock.mono() - t_req)
+            return FrameResult(fr, [], 0.0, False, seq, dark=True)
+        pots = self._read(fr, self.cfg.request_tta, force_detect=False) or []
+        self._record(fr, luma, pots, "bot", self.cfg.request_tta)
+        self.last_lit = FrameResult(fr, pots, 0.0, False, seq)
+        # DELTA: a bot frame is a sample too; push the next tick out one interval
+        self.next_tick_mono = max(self.next_tick_mono, self.clock.mono() + self.cfg.interval)
         self.stats.request_photo_latency.append(photo_ready - t_req)
         self.stats.request_reading_latency.append(self.clock.mono() - t_req)
         return FrameResult(fr, pots, 0.0, False, seq)
