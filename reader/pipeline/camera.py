@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,8 +59,12 @@ class CaptureFailed(Exception):
     """fswebcam timed out, died, or wrote garbage. The message says which."""
 
 
+# fswebcam colours its messages, and the reset code lands on a line of its own
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
 def _last_line(text: str) -> str:
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    lines = [ln.strip() for ln in _ANSI.sub("", text).splitlines() if ln.strip()]
     return lines[-1] if lines else "no output"
 
 

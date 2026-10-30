@@ -186,7 +186,9 @@ def test_fswebcam_failure_carries_its_stderr(monkeypatch, tmp_path):
 
     def fake_run(cmd, **kw):
         Path(cmd[-1]).write_bytes(b"")                 # what fswebcam 20140113 leaves
-        return sp.CompletedProcess(cmd, 0, None, b"--- Opening /dev/video0...\nTimed out waiting for frame!\n")
+        # coloured, as fswebcam prints it: the last line is only the reset code
+        return sp.CompletedProcess(cmd, 0, None, b"\x1b[1m--- Opening /dev/video0...\n"
+                                                 b"\x1b[0m\x1b[31mTimed out waiting for frame!\n\x1b[0m")
     monkeypatch.setattr(cam.subprocess, "run", fake_run)
     c = cam.FswebcamCamera(VirtualClock(0.0), lock_path="", tmp_path=str(tmp_path / "f.jpg"))
     try:
