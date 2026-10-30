@@ -8,6 +8,12 @@ bot_token = ""
 # The Telegram username of the bot's admin. This is used in the help text.
 admin_username = ""
 
+# Numeric Telegram user ids allowed to run /health, /errors and /restart in a
+# private chat with the bot (admin.py). The bot runs as root, so these are ids,
+# never usernames: a username can be changed and then claimed by someone else.
+# Empty list = the admin commands are not registered at all.
+admin_user_ids = []
+
 # The size of the pictures the webcamera takes.  As of 2022-03-06, the guild
 # room has a Creative Live! Cam Sync HD USB webcamera, which at least claims to
 # be 720p
