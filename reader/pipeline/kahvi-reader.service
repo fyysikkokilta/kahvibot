@@ -12,6 +12,9 @@
 #     sent most bot requests down the slow path.
 #   * gate agree: entropy carries no accuracy signal (the gym's GATE3_v8 report).
 #   * MemoryMax 320M: the Pi has 909 MB and also runs the bot and zigbee2mqtt.
+#   * camera-reset-cmd: under-voltage wedged the webcam twice (2026-10-27,
+#     2026-10-29) and only a reboot brought it back. The reset re-enumerates it
+#     on the USB bus; install_reader.sh installs the script and its sudoers rule.
 
 [Unit]
 Description=Coffee level reader service (camera + model + IPC)
@@ -45,6 +48,7 @@ ExecStart=/home/marci/dev/kiltiskahvi/reader/venv/bin/python \
     --model-dir /home/marci/dev/kiltiskahvi/reader/models \
     --db /home/konsta/coffee-data/kahvi.db \
     --graphs /home/marci/dev/kiltiskahvi/graphs.py \
+    --camera-reset-cmd "sudo -n /usr/local/bin/kahvi-camreset" \
     --interval 10 --reuse-max-age 30 \
     --filter --mqtt-user zigbee2mqtt --mqtt-password-file /home/konsta/mqtt.pw \
     --gate-mode agree --agree-ok-ml 40 --agree-uncertain-ml 90 \

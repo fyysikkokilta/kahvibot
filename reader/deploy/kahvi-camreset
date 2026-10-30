@@ -1,0 +1,49 @@
+#!/bin/sh
+# Re-enumerate the USB webcam: de-authorize it, wait, authorize it again, which
+# is what a replug does. kahvi-reader runs this (through sudo, see
+# install_reader.sh) after several failed captures in a row.
+#
+# Why: an under-voltage URB drop ("uvcvideo: Failed to resubmit video URB")
+# leaves the camera listed in lsusb but sending no frames. fswebcam then writes
+# an empty file every time, and on 2026-10-27 and 2026-10-29 only a reboot
+# brought it back.
+#
+#   kahvi-camreset            # reset every USB video-class device
+#   kahvi-camreset --dry-run  # only name what would be reset
+set -eu
+
+dry=0
+[ "${1:-}" = "--dry-run" ] && dry=1
+
+found=0
+for dev in /sys/bus/usb/devices/*; do
+    [ -f "$dev/authorized" ] && [ -f "$dev/idVendor" ] || continue
+    # a video-class (0e) interface on this device
+    grep -qsx 0e "$dev"/*:*/bInterfaceClass || continue
+    name="$(basename "$dev") $(cat "$dev/idVendor"):$(cat "$dev/idProduct") $(cat "$dev/product" 2>/dev/null || true)"
+    found=1
+    if [ $dry = 1 ]; then
+        echo "would reset $name"
+        continue
+    fi
+    echo 0 > "$dev/authorized"
+    sleep 2
+    echo 1 > "$dev/authorized"
+    # wait for uvcvideo to bind again, so the next capture finds the device
+    i=0
+    while [ $i -lt 10 ] && ! ls -d "$dev"/*:*/video4linux >/dev/null 2>&1; do
+        sleep 1
+        i=$((i + 1))
+    done
+    if ls -d "$dev"/*:*/video4linux >/dev/null 2>&1; then
+        echo "reset $name"
+    else
+        echo "reset $name, but no video device came back within 10 s" >&2
+        exit 1
+    fi
+done
+
+if [ $found = 0 ]; then
+    echo "no USB video device found" >&2
+    exit 1
+fi
