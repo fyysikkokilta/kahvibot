@@ -534,6 +534,13 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("eikiitos", survey.on_eikiitos))
         dispatcher.add_handler(CommandHandler("kahvistatsit", survey.on_stats))
         survey.schedule_jobs(updater.job_queue)
+    # Admin commands (admin.py): /health, /errors, /restart in a private chat,
+    # for the numeric user ids in admin_user_ids only. Empty = not registered.
+    admin_user_ids = getattr(_config, "admin_user_ids", [])
+    if admin_user_ids:
+        import admin as _admin
+        _admin.AdminCommands(admin_user_ids, logger, coffee_db=coffee_db).register(
+            dispatcher, CommandHandler)
     # Graph keywords are matched before the photo keywords, because within a
     # handler group python-telegram-bot runs only the first match: "kahvigraafi"
     # contains "kahvi" too, and the graph is the more specific request. The
