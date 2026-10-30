@@ -450,8 +450,7 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
         caption = DARK_ROOM_TEXT
         brews = brew_lines()
         if brews:
-            caption += "
-" + brews
+            caption += "\n" + brews
     elif caption_text_enabled:
         if coffee_reader_show and reading is not None:
             caption = format_reading(reading) or None
