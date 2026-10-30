@@ -127,3 +127,43 @@ def test_agreement_gate_uses_neighbour_then_falls_back():
     assert svc.last_lit.pots[0]["tier"] == "ok"
     store.flush(force=True)
     assert any(p.get("a") == 0.0 for r in store.records_since(0) for p in r.get("pots", []))
+
+
+def test_dark_request_reuses_the_dark_frame_without_the_model():
+    # Before the lights come on, every request used to need a capture plus a
+    # model run (>5 s on the Pi) and the bot gave up after 3 s.
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=300)                        # dark ticks every 60 s
+    calls, shots = svc.reader.calls, svc.camera.n
+    r = svc.frame(max_age=30)                          # the bot's max_age
+    assert r.dark and r.reused and r.pots == [] and r.age_s <= 60
+    assert svc.reader.calls == calls and svc.camera.n == shots   # no capture, no model
+
+
+def test_dark_fresh_capture_skips_the_model():
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=0)
+    clock.advance(600)                                 # dark frame too old to reuse
+    r = svc.frame(max_age=30)
+    assert r.dark and not r.reused and r.pots == [] and svc.reader.calls == 0
+
+
+def test_dark_never_serves_yesterdays_lit_frame():
+    svc, clock, store = make()
+    svc.run_due(until_mono=0)                          # a lit frame with pots
+    assert svc.last_lit.pots
+    svc.camera.grey = 3
+    svc.run_due(until_mono=70)                         # lights off
+    assert svc.darkgate.dark
+    r = svc.frame(max_age=30)
+    assert r.dark and r.pots == []
+
+
+def test_ipc_fast_path_serves_the_dark_frame():
+    from pipeline.ipc import IPCServer
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=120)
+    srv = IPCServer.__new__(IPCServer)                 # no socket needed for _fast_frame
+    srv.service = svc
+    hdr, body = srv._fast_frame({"op": "frame", "max_age": 30})
+    assert hdr["dark"] is True and hdr["pots"] == [] and hdr["fast"] and body
