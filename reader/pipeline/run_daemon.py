@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shlex
 import signal
 import sys
 from pathlib import Path
@@ -45,6 +46,9 @@ def main(argv=None) -> int:
     ap.add_argument("--run-dir", default=os.environ.get("RUNTIME_DIRECTORY", "/run/kahvi-sampler"))
     ap.add_argument("--lock", default="/run/lock/kahvicam.lock")
     ap.add_argument("--socket", default=None, help="AF_UNIX path (default <run-dir>/ipc.sock) or TCP port")
+    ap.add_argument("--camera-reset-cmd", default="",
+                    help="command that re-enumerates a wedged webcam, e.g. "
+                         "'sudo -n /usr/local/bin/kahvi-camreset'; empty: never reset")
     ap.add_argument("--graphs", default="/home/marci/dev/kiltiskahvi/graphs.py")
     ap.add_argument("--interval", type=float, default=10.0)
     ap.add_argument("--dark-interval", type=float, default=60.0)
@@ -81,7 +85,8 @@ def main(argv=None) -> int:
         sock = int(sock)
 
     clock = RealClock()
-    camera = FswebcamCamera(clock, lock_path=a.lock, tmp_path=str(run_dir / "frame.jpg"))
+    camera = FswebcamCamera(clock, lock_path=a.lock, tmp_path=str(run_dir / "frame.jpg"),
+                            reset_cmd=shlex.split(a.camera_reset_cmd) or None)
     reader = WarmReader(model_dir, threads=a.threads)
     store = ReadingsStore(a.db, clock)
     graphs_mod = None

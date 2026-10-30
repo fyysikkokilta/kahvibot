@@ -60,6 +60,10 @@ class FailBackoff:
     def ok(self):
         self.fails = 0
 
+    def restart(self):
+        """Something changed (the camera was reset): retry at the first step."""
+        self.fails = min(self.fails, 1)
+
     def delay(self):
         return 0.0 if not self.fails else self.STEPS[min(self.fails - 1, len(self.STEPS) - 1)]
 
@@ -130,6 +134,11 @@ class ServiceConfig:
     mqtt_base_topic: str = "zigbee2mqtt"
     power_devices: dict = field(default_factory=lambda: {"left": "vasen", "right": "oikea"})
     full_ml: float = 1250.0
+    # A wedged webcam (under-voltage URB drop) fails every capture until it is
+    # re-enumerated. After this many failed captures in a row the camera's
+    # reset() runs, then at most once per camera_reset_every_s.
+    camera_reset_after: int = 3
+    camera_reset_every_s: float = 900.0
 
 
 @dataclass
@@ -138,6 +147,7 @@ class Stats:
     ticks_dark: int = 0
     ticks_skipped_busy: int = 0
     ticks_failed: int = 0
+    camera_resets: int = 0
     requests: int = 0
     requests_reused: int = 0
     requests_captured: int = 0
@@ -176,6 +186,8 @@ class ReaderService:
         # Liveness for the systemd watchdog: set after every tick that returns,
         # so a tick that never comes back is visible as a stall (notify.py).
         self.last_tick_mono = clock.mono()
+        self.capture_fails = 0                  # CaptureFailed in a row
+        self.last_reset_mono: Optional[float] = None
         self.daybuf = DayBuffer()
         # One filter per pot. Volume is sampled because its observation is
         # multimodal; temperature rides along in a Kalman filter inside each
@@ -231,14 +243,36 @@ class ReaderService:
         except CaptureBusy:
             self.stats.ticks_skipped_busy += 1
             return None
-        except CaptureFailed:
+        except CaptureFailed as e:
             self.stats.ticks_failed += 1
             self.backoff.fail()
+            self._capture_failed(str(e))
             return None
         self.stats.captures += 1
+        if self.capture_fails:
+            log.info("camera back after %d failed captures", self.capture_fails)
+            self.capture_fails = 0
         if self.backoff.active:
             self.backoff.ok()
         return fr
+
+    def _capture_failed(self, why: str) -> None:
+        self.capture_fails += 1
+        log.warning("capture failed (%d in a row): %s", self.capture_fails, why or "no reason given")
+        reset = getattr(self.camera, "reset", None)
+        if reset is None or self.capture_fails < self.cfg.camera_reset_after:
+            return
+        now = self.clock.mono()
+        if self.last_reset_mono is not None and now - self.last_reset_mono < self.cfg.camera_reset_every_s:
+            return
+        self.last_reset_mono = now
+        self.stats.camera_resets += 1
+        ok, detail = reset()
+        if ok:
+            log.warning("camera reset: %s", detail)
+            self.backoff.restart()
+        else:
+            log.error("camera reset failed: %s", detail)
 
     def _read(self, frame: Frame, tta: int, force_detect: bool = False):
         """Detect (amortised) + read. Returns pots (gate-annotated) or None."""
