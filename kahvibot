@@ -406,8 +406,11 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     return img, None, raw
 
 
-DARK_ROOM_TEXT = ("🌙 Kiltiksellä on valot pois, eli kukaan ei ole vielä paikalla. / "
-                  "The guild room lights are off, so nobody is there yet.")
+# Say only what the camera can see. The old text ("so nobody is there yet")
+# guessed at people from one dark frame, which was wrong after hours (it went
+# out at 21:06, 22:39 and 03:33 in 2026-11) and is not the bot's call to make.
+DARK_ROOM_TEXT = ("🌙 Kiltiksellä on valot pois, joten pannuja ei näe kuvasta. / "
+                  "The guild room lights are off, so the pots aren't visible.")
 
 
 def send_webcam_photo(update: Update, ctx: CallbackContext):
@@ -443,7 +446,7 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.seek(0)
 
     caption = None
-    # A dark guild room means nobody is there yet. Say so even with captions
+    # In a dark guild room the photo is black. Say why even with captions
     # off: a black photo alone reads as a broken bot.
     dark = bool(reading and reading.get("dark"))
     if dark:
