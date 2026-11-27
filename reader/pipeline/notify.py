@@ -113,9 +113,14 @@ class LoopHealth:
         elapsed = now - prev[0]
         if elapsed >= self.rate_window:
             self._prev = (now, ticks)
-            rate = (ticks - prev[1]) / elapsed if elapsed > 0 else 0.0
+            n = ticks - prev[1]
+            rate = n / elapsed if elapsed > 0 else 0.0
             expected = 1.0 / cadence if cadence > 0 else float("inf")
-            if cadence > 0 and rate > self.runaway_factor * expected:
+            # Compare tick counts, not rates: a window shorter than the cadence
+            # still holds one ordinary tick, and at the 60-300 s dark/backoff
+            # cadences one tick in 5 s read as a runaway (~650 false ERRORs a
+            # day, 2026-11). The +1 allows the tick that lands in any window.
+            if cadence > 0 and n > self.runaway_factor * (elapsed / cadence + 1.0):
                 return "tick rate %.1f/s against an expected %.2f/s (cadence %.0f s)" % (
                     rate, expected, cadence)
         return None

@@ -126,3 +126,18 @@ def test_recovers_after_a_stall():
     h = LoopHealth()
     h.check(now=200.0, last_tick_mono=100.0, ticks=10, cadence=10.0)
     assert h.check(now=210.0, last_tick_mono=209.0, ticks=11, cadence=10.0) is None
+
+
+def test_one_tick_at_night_cadence_is_not_a_runaway():
+    """The field false positive: one tick in a 5-10 s window at cadence 60-300 s."""
+    for cadence, elapsed in [(60.0, 5.0), (60.0, 10.0), (160.0, 6.0), (300.0, 8.0)]:
+        h = LoopHealth()
+        assert h.check(now=0.0, last_tick_mono=0.0, ticks=0, cadence=cadence) is None
+        assert h.check(now=elapsed, last_tick_mono=elapsed, ticks=1, cadence=cadence) is None
+
+
+def test_runaway_at_night_cadence_is_still_caught():
+    h = LoopHealth()
+    assert h.check(now=0.0, last_tick_mono=0.0, ticks=0, cadence=60.0) is None
+    reason = h.check(now=6.0, last_tick_mono=6.0, ticks=20, cadence=60.0)
+    assert reason is not None and "tick rate" in reason
