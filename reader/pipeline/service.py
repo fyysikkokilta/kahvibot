@@ -60,6 +60,10 @@ class FailBackoff:
     def ok(self):
         self.fails = 0
 
+    def restart(self):
+        """Something changed (the camera was reset): retry at the first step."""
+        self.fails = min(self.fails, 1)
+
     def delay(self):
         return 0.0 if not self.fails else self.STEPS[min(self.fails - 1, len(self.STEPS) - 1)]
 
@@ -108,6 +112,11 @@ class ServiceConfig:
     # how stale a held frame may be before it is worth making the caller
     # wait for a new capture instead
     stale_max_age: float = 90.0       # bot frames younger than this are reused
+    # In the dark the room does not change, and a fresh capture plus a model
+    # run takes longer than the bot waits (>5 s against its 3 s), so before
+    # the lights came on every request failed. A dark frame this young is
+    # reused instead; dark ticks come every dark_interval.
+    dark_reuse_max_age: float = 180.0
     request_tta: int = 1              # DELTA: no TTA in the request path
     flush_sec: float = 60.0
     graph_ttl_s: float = 600.0
@@ -130,6 +139,19 @@ class ServiceConfig:
     mqtt_base_topic: str = "zigbee2mqtt"
     power_devices: dict = field(default_factory=lambda: {"left": "vasen", "right": "oikea"})
     full_ml: float = 1250.0
+    # A wedged webcam (under-voltage URB drop) fails every capture until it is
+    # re-enumerated. After this many failed captures in a row the camera's
+    # reset() runs, then at most once per camera_reset_every_s.
+    camera_reset_after: int = 3
+    camera_reset_every_s: float = 900.0
+    # A USB reset has never cleared an under-voltage wedge in the field
+    # (2026-11-21: 134 resets over 31 h; a service restart did not help either),
+    # only a reboot. Once captures have failed for this long, and at least one
+    # reset has been tried, the service asks for one. The root-owned script
+    # behind `reboot` refuses a second wedge reboot within 6 h, so a camera that
+    # is simply unplugged cannot put the Pi in a reboot loop. 0 disables.
+    wedge_reboot_after_s: float = 1800.0
+    wedge_reboot_retry_s: float = 3600.0
 
 
 @dataclass
@@ -138,6 +160,8 @@ class Stats:
     ticks_dark: int = 0
     ticks_skipped_busy: int = 0
     ticks_failed: int = 0
+    camera_resets: int = 0
+    reboot_requests: int = 0
     requests: int = 0
     requests_reused: int = 0
     requests_captured: int = 0
@@ -155,11 +179,15 @@ class FrameResult:
     age_s: float
     reused: bool
     seq: int
+    dark: bool = False              # the room was dark: a photo, but no reading
 
 
 class ReaderService:
     def __init__(self, camera, reader, store: ReadingsStore, clock, gate: Gate,
-                 cfg: ServiceConfig = ServiceConfig(), graphs_mod=None, font_dir=None):
+                 cfg: ServiceConfig = ServiceConfig(), graphs_mod=None, font_dir=None,
+                 reboot=None):
+        # reboot: callable -> (ok, detail) that reboots the machine; None: never.
+        self.reboot = reboot
         self.camera, self.reader, self.store, self.clock = camera, reader, store, clock
         self.gate, self.cfg = gate, cfg
         self.darkgate, self.backoff, self.boxcache = DarkGate(), FailBackoff(), BoxCache()
@@ -171,11 +199,17 @@ class ReaderService:
         self.last_ml: dict = {}
         self.prev_h: dict = {}          # side -> (mono, h) of the previous reading, for agreement
         self.last_lit: Optional[FrameResult] = None
+        self.last_dark: Optional[FrameResult] = None
         self.last_lit_tick_mono: Optional[float] = None
         self.next_tick_mono = clock.mono()
         # Liveness for the systemd watchdog: set after every tick that returns,
         # so a tick that never comes back is visible as a stall (notify.py).
         self.last_tick_mono = clock.mono()
+        self.capture_fails = 0                  # CaptureFailed in a row
+        self.last_reset_mono: Optional[float] = None
+        self.fail_since_mono: Optional[float] = None   # first failure of the current run
+        self.resets_this_run = 0
+        self.last_reboot_try_mono: Optional[float] = None
         self.daybuf = DayBuffer()
         # One filter per pot. Volume is sampled because its observation is
         # multimodal; temperature rides along in a Kalman filter inside each
@@ -231,14 +265,69 @@ class ReaderService:
         except CaptureBusy:
             self.stats.ticks_skipped_busy += 1
             return None
-        except CaptureFailed:
+        except CaptureFailed as e:
             self.stats.ticks_failed += 1
             self.backoff.fail()
+            self._capture_failed(str(e))
             return None
         self.stats.captures += 1
+        if self.capture_fails:
+            log.info("camera back after %d failed captures", self.capture_fails)
+            self.capture_fails = 0
+            self.fail_since_mono = None
+            self.resets_this_run = 0
         if self.backoff.active:
             self.backoff.ok()
         return fr
+
+    def _capture_failed(self, why: str) -> None:
+        self.capture_fails += 1
+        log.warning("capture failed (%d in a row): %s", self.capture_fails, why or "no reason given")
+        now = self.clock.mono()
+        if self.fail_since_mono is None:
+            self.fail_since_mono = now
+        self._maybe_reset(now)
+        self._maybe_reboot(now)
+
+    def _maybe_reset(self, now: float) -> None:
+        reset = getattr(self.camera, "reset", None)
+        if reset is None or self.capture_fails < self.cfg.camera_reset_after:
+            return
+        if self.last_reset_mono is not None and now - self.last_reset_mono < self.cfg.camera_reset_every_s:
+            return
+        self.last_reset_mono = now
+        self.stats.camera_resets += 1
+        self.resets_this_run += 1
+        ok, detail = reset()
+        if ok:
+            log.warning("camera reset: %s", detail)
+            self.backoff.restart()
+        else:
+            log.error("camera reset failed: %s", detail)
+
+    def _maybe_reboot(self, now: float) -> None:
+        cfg = self.cfg
+        if self.reboot is None or cfg.wedge_reboot_after_s <= 0:
+            return
+        # A camera without reset() can't be helped by one; otherwise the cheap
+        # fix gets its chance first.
+        if getattr(self.camera, "reset", None) is not None and self.resets_this_run < 1:
+            return
+        down = now - self.fail_since_mono
+        if down < cfg.wedge_reboot_after_s:
+            return
+        if (self.last_reboot_try_mono is not None
+                and now - self.last_reboot_try_mono < cfg.wedge_reboot_retry_s):
+            return
+        self.last_reboot_try_mono = now
+        self.stats.reboot_requests += 1
+        log.error("camera wedged for %.0f min (%d failed captures, %d resets): asking for a reboot",
+                  down / 60.0, self.capture_fails, self.resets_this_run)
+        ok, detail = self.reboot()
+        if ok:
+            log.error("reboot requested: %s", detail)
+        else:
+            log.error("reboot refused or failed: %s", detail)
 
     def _read(self, frame: Frame, tta: int, force_detect: bool = False):
         """Detect (amortised) + read. Returns pots (gate-annotated) or None."""
@@ -379,6 +468,7 @@ class ReaderService:
                    "state": "dark", "luma": round(luma, 1)}
             self.store.add(rec)
             self.daybuf.add(rec, fr.captured_wall)
+            self.last_dark = FrameResult(fr, [], 0.0, False, self.seq, dark=True)
             self.seq += 1
             return
         tta = 8 if (self.cfg.tta_probe_every and self.reading_n % self.cfg.tta_probe_every == 0) else 1
@@ -429,7 +519,14 @@ class ReaderService:
         self.stats.requests += 1
         t_req = self.clock.mono()
         max_age = self.cfg.reuse_max_age if max_age is None else max_age
-        if self.last_lit is not None:
+        if self.darkgate.dark and self.last_dark is not None:
+            age = self.clock.mono() - self.last_dark.frame.captured_mono
+            if age <= max(max_age, self.cfg.dark_reuse_max_age):
+                self.stats.requests_reused += 1
+                self.stats.request_photo_latency.append(0.0)
+                self.stats.request_reading_latency.append(0.0)
+                return FrameResult(self.last_dark.frame, [], age, True, self.last_dark.seq, dark=True)
+        if self.last_lit is not None and not self.darkgate.dark:
             age = self.clock.mono() - self.last_lit.frame.captured_mono
             if age <= max_age:
                 self.stats.requests_reused += 1
@@ -453,6 +550,11 @@ class ReaderService:
                 break
             self.clock.sleep(1.0)           # nothing usable in hand: keep trying
             fr = self._capture()
+        if fr is None and self.darkgate.dark and self.last_dark is not None:
+            # yesterday evening's lit frame would show coffee that is not there
+            age = self.clock.mono() - self.last_dark.frame.captured_mono
+            self.stats.requests_reused += 1
+            return FrameResult(self.last_dark.frame, [], age, True, self.last_dark.seq, dark=True)
         if fr is None:
             # The camera is busy - usually this service's own tick holds the
             # lock. Returning None sends the bot off to a cold fswebcam plus a
@@ -468,13 +570,18 @@ class ReaderService:
         self.stats.requests_captured += 1
         photo_ready = self.clock.mono()
         luma = fr.luma() or 0.0
-        pots = self._read(fr, self.cfg.request_tta, force_detect=False) or []
         seq = self.seq
-        if not self.darkgate.update(luma):
-            self._record(fr, luma, pots, "bot", self.cfg.request_tta)
-            self.last_lit = FrameResult(fr, pots, 0.0, False, seq)
-            # DELTA: a bot frame is a sample too; push the next tick out one interval
-            self.next_tick_mono = max(self.next_tick_mono, self.clock.mono() + self.cfg.interval)
+        if self.darkgate.update(luma):
+            # no model run on a dark frame: it finds nothing and costs seconds
+            self.last_dark = FrameResult(fr, [], 0.0, False, seq, dark=True)
+            self.stats.request_photo_latency.append(photo_ready - t_req)
+            self.stats.request_reading_latency.append(self.clock.mono() - t_req)
+            return FrameResult(fr, [], 0.0, False, seq, dark=True)
+        pots = self._read(fr, self.cfg.request_tta, force_detect=False) or []
+        self._record(fr, luma, pots, "bot", self.cfg.request_tta)
+        self.last_lit = FrameResult(fr, pots, 0.0, False, seq)
+        # DELTA: a bot frame is a sample too; push the next tick out one interval
+        self.next_tick_mono = max(self.next_tick_mono, self.clock.mono() + self.cfg.interval)
         self.stats.request_photo_latency.append(photo_ready - t_req)
         self.stats.request_reading_latency.append(self.clock.mono() - t_req)
         return FrameResult(fr, pots, 0.0, False, seq)

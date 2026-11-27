@@ -12,7 +12,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pipeline.camera import Frame                       # noqa: E402
+from pipeline.camera import CaptureFailed, Frame        # noqa: E402
 from pipeline.clock import VirtualClock                 # noqa: E402
 from pipeline.gate import Gate                          # noqa: E402
 from pipeline.service import ReaderService, ServiceConfig  # noqa: E402
@@ -127,3 +127,176 @@ def test_agreement_gate_uses_neighbour_then_falls_back():
     assert svc.last_lit.pots[0]["tier"] == "ok"
     store.flush(force=True)
     assert any(p.get("a") == 0.0 for r in store.records_since(0) for p in r.get("pots", []))
+
+
+class WedgedCamera(FakeCamera):
+    """Fails every capture until reset() has run `fix_after` times."""
+
+    def __init__(self, clock, fix_after=1, reset_ok=True):
+        super().__init__(clock)
+        self.resets, self.fix_after, self.reset_ok = 0, fix_after, reset_ok
+
+    def capture(self):
+        if self.resets < self.fix_after:
+            self.clock.sleep(8.0)
+            raise CaptureFailed("empty frame (exit 0): Timed out waiting for frame!")
+        return super().capture()
+
+    def reset(self):
+        self.resets += 1
+        return self.reset_ok, "reset 1-1.3 041e:4095"
+
+
+def test_wedged_camera_is_reset_then_recovers(caplog):
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock)
+    with caplog.at_level("INFO", logger="kahvi.service"):
+        svc.run_due(until_mono=600)
+    assert svc.camera.resets == 1 and svc.stats.camera_resets == 1
+    assert svc.stats.ticks_failed == svc.cfg.camera_reset_after
+    assert svc.capture_fails == 0 and not svc.backoff.active
+    assert svc.cadence() == 10.0                       # back to normal, not stuck at 300 s
+    text = caplog.text
+    assert "Timed out waiting for frame!" in text      # the reason reaches the journal
+    assert "camera reset: reset 1-1.3" in text
+    assert "camera back after 3 failed captures" in text
+
+
+def test_reset_is_rate_limited_while_the_camera_stays_dead():
+    svc, clock, store = make(cfg=ServiceConfig(camera_reset_every_s=900.0))
+    svc.camera = WedgedCamera(clock, fix_after=10**6, reset_ok=False)
+    svc.run_due(until_mono=3000)
+    assert svc.stats.ticks_failed > 10
+    assert 2 <= svc.camera.resets <= 4                 # ~once per 900 s, not once per failure
+
+
+def test_camera_without_reset_still_backs_off():
+    class Dead(FakeCamera):
+        def capture(self):
+            raise CaptureFailed("fswebcam timed out after 8 s")
+    svc, clock, store = make()
+    svc.camera = Dead(clock)
+    svc.run_due(until_mono=1200)
+    assert svc.stats.camera_resets == 0 and svc.cadence() == 300.0
+
+
+def test_fswebcam_failure_carries_its_stderr(monkeypatch, tmp_path):
+    import subprocess as sp
+    from pipeline import camera as cam
+
+    def fake_run(cmd, **kw):
+        Path(cmd[-1]).write_bytes(b"")                 # what fswebcam 20140113 leaves
+        # coloured, as fswebcam prints it: the last line is only the reset code
+        return sp.CompletedProcess(cmd, 0, None, b"\x1b[1m--- Opening /dev/video0...\n"
+                                                 b"\x1b[0m\x1b[31mTimed out waiting for frame!\n\x1b[0m")
+    monkeypatch.setattr(cam.subprocess, "run", fake_run)
+    c = cam.FswebcamCamera(VirtualClock(0.0), lock_path="", tmp_path=str(tmp_path / "f.jpg"))
+    try:
+        c.capture()
+    except CaptureFailed as e:
+        assert str(e) == "empty frame (exit 0): Timed out waiting for frame!"
+    else:
+        raise AssertionError("an empty frame must fail")
+    assert c.reset() == (False, "no reset command configured")
+
+
+class FakeReboot:
+    def __init__(self, ok=True):
+        self.calls, self.ok = 0, ok
+
+    def __call__(self):
+        self.calls += 1
+        return self.ok, "rebooting" if self.ok else "exit 2: refused: the last wedge reboot was 10 min ago"
+
+
+def test_wedge_that_resets_cannot_fix_asks_for_a_reboot(caplog):
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6, reset_ok=True)
+    svc.reboot = FakeReboot()
+    with caplog.at_level("INFO", logger="kahvi.service"):
+        svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s - 60)
+        assert svc.reboot.calls == 0                   # the reset gets its 30 min first
+        svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s + 400)
+    assert svc.reboot.calls == 1 and svc.stats.reboot_requests == 1
+    assert svc.camera.resets >= 1
+    assert "asking for a reboot" in caplog.text
+
+
+def test_refused_reboot_is_retried_hourly_not_every_failure():
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6, reset_ok=False)
+    svc.reboot = FakeReboot(ok=False)
+    svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s + 2 * svc.cfg.wedge_reboot_retry_s + 400)
+    assert svc.reboot.calls == 3
+
+
+def test_a_short_outage_does_not_reboot():
+    """A camera that a reset brings back never gets near the reboot."""
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=1)
+    svc.reboot = FakeReboot()
+    svc.run_due(until_mono=3 * svc.cfg.wedge_reboot_after_s)
+    assert svc.reboot.calls == 0 and svc.fail_since_mono is None
+
+
+def test_failure_clock_restarts_after_recovery():
+    """Two separate 20 min outages are not one 40 min outage."""
+    class Flaky(FakeCamera):
+        def capture(self):
+            if (self.clock.mono() // 1500) % 2 == 0 and self.clock.mono() > 100:
+                raise CaptureFailed("fswebcam timed out after 8 s")
+            return super().capture()
+
+        def reset(self):
+            return True, "reset"
+    svc, clock, store = make()
+    svc.camera = Flaky(clock)
+    svc.reboot = FakeReboot()
+    svc.run_due(until_mono=6 * 1500)
+    assert svc.reboot.calls == 0
+
+
+def test_reboot_disabled_by_default():
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6)
+    svc.run_due(until_mono=3 * svc.cfg.wedge_reboot_after_s)
+    assert svc.stats.reboot_requests == 0              # no reboot callable given
+
+def test_dark_request_reuses_the_dark_frame_without_the_model():
+    # Before the lights come on, every request used to need a capture plus a
+    # model run (>5 s on the Pi) and the bot gave up after 3 s.
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=300)                        # dark ticks every 60 s
+    calls, shots = svc.reader.calls, svc.camera.n
+    r = svc.frame(max_age=30)                          # the bot's max_age
+    assert r.dark and r.reused and r.pots == [] and r.age_s <= 60
+    assert svc.reader.calls == calls and svc.camera.n == shots   # no capture, no model
+
+
+def test_dark_fresh_capture_skips_the_model():
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=0)
+    clock.advance(600)                                 # dark frame too old to reuse
+    r = svc.frame(max_age=30)
+    assert r.dark and not r.reused and r.pots == [] and svc.reader.calls == 0
+
+
+def test_dark_never_serves_yesterdays_lit_frame():
+    svc, clock, store = make()
+    svc.run_due(until_mono=0)                          # a lit frame with pots
+    assert svc.last_lit.pots
+    svc.camera.grey = 3
+    svc.run_due(until_mono=70)                         # lights off
+    assert svc.darkgate.dark
+    r = svc.frame(max_age=30)
+    assert r.dark and r.pots == []
+
+
+def test_ipc_fast_path_serves_the_dark_frame():
+    from pipeline.ipc import IPCServer
+    svc, clock, store = make(grey=3)
+    svc.run_due(until_mono=120)
+    srv = IPCServer.__new__(IPCServer)                 # no socket needed for _fast_frame
+    srv.service = svc
+    hdr, body = srv._fast_frame({"op": "frame", "max_age": 30})
+    assert hdr["dark"] is True and hdr["pots"] == [] and hdr["fast"] and body
