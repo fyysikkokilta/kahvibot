@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pipeline.camera import FswebcamCamera          # noqa: E402
+from pipeline.camera import FswebcamCamera, run_cmd  # noqa: E402
 from pipeline.clock import RealClock                # noqa: E402
 from pipeline.gate import Gate                      # noqa: E402
 from pipeline.graphing import load_kahvibot_graphs  # noqa: E402
@@ -49,6 +49,11 @@ def main(argv=None) -> int:
     ap.add_argument("--camera-reset-cmd", default="",
                     help="command that re-enumerates a wedged webcam, e.g. "
                          "'sudo -n /usr/local/bin/kahvi-camreset'; empty: never reset")
+    ap.add_argument("--wedge-reboot-cmd", default="",
+                    help="command that reboots the Pi when the webcam stays wedged, e.g. "
+                         "'sudo -n /usr/local/bin/kahvi-wedge-reboot'; empty: never reboot")
+    ap.add_argument("--wedge-reboot-after", type=float, default=1800.0,
+                    help="seconds of failed captures (after a USB reset) before a reboot")
     ap.add_argument("--graphs", default="/home/marci/dev/kiltiskahvi/graphs.py")
     ap.add_argument("--interval", type=float, default=10.0)
     ap.add_argument("--dark-interval", type=float, default=60.0)
@@ -95,7 +100,8 @@ def main(argv=None) -> int:
             graphs_mod = load_kahvibot_graphs(a.graphs)
         except Exception:  # noqa: BLE001
             logging.getLogger("kahvi").warning("graphs module unavailable", exc_info=True)
-    cfg = ServiceConfig(interval=a.interval, dark_interval=a.dark_interval,
+    cfg = ServiceConfig(wedge_reboot_after_s=a.wedge_reboot_after,
+                        interval=a.interval, dark_interval=a.dark_interval,
                         detect_every=a.detect_every, tta_probe_every=a.tta_probe_every,
                         reuse_max_age=a.reuse_max_age,
                         filter_enabled=a.filter, filter_particles=a.filter_particles,
@@ -106,7 +112,10 @@ def main(argv=None) -> int:
                         mqtt_base_topic=a.mqtt_base_topic)
     gate = Gate(a.gate_ok, a.gate_uncertain, mode=a.gate_mode,
                 agree_ok_ml=a.agree_ok_ml, agree_unc_ml=a.agree_uncertain_ml)
-    svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod)
+    reboot_cmd = shlex.split(a.wedge_reboot_cmd)
+    reboot = (lambda: run_cmd(reboot_cmd, 30.0)) if reboot_cmd else None
+    svc = ReaderService(camera, reader, store, clock, gate, cfg, graphs_mod=graphs_mod,
+                        reboot=reboot)
     # Recover today's readings, so /graph has the day straight after a restart.
     try:
         seeded = svc.daybuf.seed(store, clock.wall())

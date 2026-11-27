@@ -139,6 +139,14 @@ class ServiceConfig:
     # reset() runs, then at most once per camera_reset_every_s.
     camera_reset_after: int = 3
     camera_reset_every_s: float = 900.0
+    # A USB reset has never cleared an under-voltage wedge in the field
+    # (2026-11-21: 134 resets over 31 h; a service restart did not help either),
+    # only a reboot. Once captures have failed for this long, and at least one
+    # reset has been tried, the service asks for one. The root-owned script
+    # behind `reboot` refuses a second wedge reboot within 6 h, so a camera that
+    # is simply unplugged cannot put the Pi in a reboot loop. 0 disables.
+    wedge_reboot_after_s: float = 1800.0
+    wedge_reboot_retry_s: float = 3600.0
 
 
 @dataclass
@@ -148,6 +156,7 @@ class Stats:
     ticks_skipped_busy: int = 0
     ticks_failed: int = 0
     camera_resets: int = 0
+    reboot_requests: int = 0
     requests: int = 0
     requests_reused: int = 0
     requests_captured: int = 0
@@ -169,7 +178,10 @@ class FrameResult:
 
 class ReaderService:
     def __init__(self, camera, reader, store: ReadingsStore, clock, gate: Gate,
-                 cfg: ServiceConfig = ServiceConfig(), graphs_mod=None, font_dir=None):
+                 cfg: ServiceConfig = ServiceConfig(), graphs_mod=None, font_dir=None,
+                 reboot=None):
+        # reboot: callable -> (ok, detail) that reboots the machine; None: never.
+        self.reboot = reboot
         self.camera, self.reader, self.store, self.clock = camera, reader, store, clock
         self.gate, self.cfg = gate, cfg
         self.darkgate, self.backoff, self.boxcache = DarkGate(), FailBackoff(), BoxCache()
@@ -188,6 +200,9 @@ class ReaderService:
         self.last_tick_mono = clock.mono()
         self.capture_fails = 0                  # CaptureFailed in a row
         self.last_reset_mono: Optional[float] = None
+        self.fail_since_mono: Optional[float] = None   # first failure of the current run
+        self.resets_this_run = 0
+        self.last_reboot_try_mono: Optional[float] = None
         self.daybuf = DayBuffer()
         # One filter per pot. Volume is sampled because its observation is
         # multimodal; temperature rides along in a Kalman filter inside each
@@ -252,6 +267,8 @@ class ReaderService:
         if self.capture_fails:
             log.info("camera back after %d failed captures", self.capture_fails)
             self.capture_fails = 0
+            self.fail_since_mono = None
+            self.resets_this_run = 0
         if self.backoff.active:
             self.backoff.ok()
         return fr
@@ -259,20 +276,51 @@ class ReaderService:
     def _capture_failed(self, why: str) -> None:
         self.capture_fails += 1
         log.warning("capture failed (%d in a row): %s", self.capture_fails, why or "no reason given")
+        now = self.clock.mono()
+        if self.fail_since_mono is None:
+            self.fail_since_mono = now
+        self._maybe_reset(now)
+        self._maybe_reboot(now)
+
+    def _maybe_reset(self, now: float) -> None:
         reset = getattr(self.camera, "reset", None)
         if reset is None or self.capture_fails < self.cfg.camera_reset_after:
             return
-        now = self.clock.mono()
         if self.last_reset_mono is not None and now - self.last_reset_mono < self.cfg.camera_reset_every_s:
             return
         self.last_reset_mono = now
         self.stats.camera_resets += 1
+        self.resets_this_run += 1
         ok, detail = reset()
         if ok:
             log.warning("camera reset: %s", detail)
             self.backoff.restart()
         else:
             log.error("camera reset failed: %s", detail)
+
+    def _maybe_reboot(self, now: float) -> None:
+        cfg = self.cfg
+        if self.reboot is None or cfg.wedge_reboot_after_s <= 0:
+            return
+        # A camera without reset() can't be helped by one; otherwise the cheap
+        # fix gets its chance first.
+        if getattr(self.camera, "reset", None) is not None and self.resets_this_run < 1:
+            return
+        down = now - self.fail_since_mono
+        if down < cfg.wedge_reboot_after_s:
+            return
+        if (self.last_reboot_try_mono is not None
+                and now - self.last_reboot_try_mono < cfg.wedge_reboot_retry_s):
+            return
+        self.last_reboot_try_mono = now
+        self.stats.reboot_requests += 1
+        log.error("camera wedged for %.0f min (%d failed captures, %d resets): asking for a reboot",
+                  down / 60.0, self.capture_fails, self.resets_this_run)
+        ok, detail = self.reboot()
+        if ok:
+            log.error("reboot requested: %s", detail)
+        else:
+            log.error("reboot refused or failed: %s", detail)
 
     def _read(self, frame: Frame, tta: int, force_detect: bool = False):
         """Detect (amortised) + read. Returns pots (gate-annotated) or None."""

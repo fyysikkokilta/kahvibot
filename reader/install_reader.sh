@@ -57,6 +57,15 @@ sudo visudo -cf "$SUDOERS_TMP" >/dev/null
 sudo install -o root -g root -m 0440 "$SUDOERS_TMP" /etc/sudoers.d/kahvi-camreset
 rm -f "$SUDOERS_TMP"
 
+# 3c. The wedge reboot: the same arrangement, for when a USB reset is not
+#     enough. The script itself refuses a second reboot within 6 h.
+sudo install -o root -g root -m 0755 "$HERE/deploy/kahvi-wedge-reboot" /usr/local/bin/kahvi-wedge-reboot
+SUDOERS_TMP="$(mktemp)"
+echo "$RUN_USER ALL=(root) NOPASSWD: /usr/local/bin/kahvi-wedge-reboot" > "$SUDOERS_TMP"
+sudo visudo -cf "$SUDOERS_TMP" >/dev/null
+sudo install -o root -g root -m 0440 "$SUDOERS_TMP" /etc/sudoers.d/kahvi-wedge-reboot
+rm -f "$SUDOERS_TMP"
+
 # 4. The unit, with this checkout's paths filled in.
 sed -e "s|/home/marci/dev/kiltiskahvi/reader|$HERE|g" \
     -e "s|/home/marci/dev/kiltiskahvi/graphs.py|$BOT/graphs.py|g" \
@@ -100,6 +109,7 @@ echo
 echo "=== next ==="
 echo "  journalctl -u kahvi-reader -f                 # one line per state change"
 echo "  sudo kahvi-camreset --dry-run                 # the webcam a reset would replug"
+echo "  sudo kahvi-wedge-reboot --dry-run             # whether a wedge reboot is allowed now"
 echo "  (cd $HERE && venv/bin/python -m pipeline.kahvidb stats $DATA/kahvi.db)"
 echo "  ls -l /run/kahvi-sampler/ipc.sock             # the bot's socket"
 echo "  bot config.py: reader_service_socket = \"/run/kahvi-sampler/ipc.sock\""

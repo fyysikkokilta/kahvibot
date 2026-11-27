@@ -68,6 +68,21 @@ def _last_line(text: str) -> str:
     return lines[-1] if lines else "no output"
 
 
+def run_cmd(cmd: list, timeout: float) -> "tuple[bool, str]":
+    """Run a helper command. Returns (ok, its last line of output)."""
+    try:
+        p = subprocess.run(cmd, timeout=timeout,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except subprocess.TimeoutExpired:
+        return False, "timed out after %.0f s" % timeout
+    except OSError as e:
+        return False, str(e)
+    detail = _last_line(p.stdout.decode("utf-8", "replace"))
+    if p.returncode != 0:
+        detail = "exit %d: %s" % (p.returncode, detail)
+    return p.returncode == 0, detail
+
+
 class FswebcamCamera:
     """The Pi camera. Holds the flock only across fswebcam, never across inference.
 
@@ -93,17 +108,7 @@ class FswebcamCamera:
         """Run the reset command. Returns (ok, its last line of output)."""
         if not self.reset_cmd:
             return False, "no reset command configured"
-        try:
-            p = subprocess.run(self.reset_cmd, timeout=self.reset_timeout,
-                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        except subprocess.TimeoutExpired:
-            return False, "timed out after %.0f s" % self.reset_timeout
-        except OSError as e:
-            return False, str(e)
-        detail = _last_line(p.stdout.decode("utf-8", "replace"))
-        if p.returncode != 0:
-            detail = "exit %d: %s" % (p.returncode, detail)
-        return p.returncode == 0, detail
+        return run_cmd(self.reset_cmd, self.reset_timeout)
 
     def capture(self) -> Frame:
         lock_fd = None

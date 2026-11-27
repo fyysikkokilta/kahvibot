@@ -198,3 +198,66 @@ def test_fswebcam_failure_carries_its_stderr(monkeypatch, tmp_path):
     else:
         raise AssertionError("an empty frame must fail")
     assert c.reset() == (False, "no reset command configured")
+
+
+class FakeReboot:
+    def __init__(self, ok=True):
+        self.calls, self.ok = 0, ok
+
+    def __call__(self):
+        self.calls += 1
+        return self.ok, "rebooting" if self.ok else "exit 2: refused: the last wedge reboot was 10 min ago"
+
+
+def test_wedge_that_resets_cannot_fix_asks_for_a_reboot(caplog):
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6, reset_ok=True)
+    svc.reboot = FakeReboot()
+    with caplog.at_level("INFO", logger="kahvi.service"):
+        svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s - 60)
+        assert svc.reboot.calls == 0                   # the reset gets its 30 min first
+        svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s + 400)
+    assert svc.reboot.calls == 1 and svc.stats.reboot_requests == 1
+    assert svc.camera.resets >= 1
+    assert "asking for a reboot" in caplog.text
+
+
+def test_refused_reboot_is_retried_hourly_not_every_failure():
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6, reset_ok=False)
+    svc.reboot = FakeReboot(ok=False)
+    svc.run_due(until_mono=svc.cfg.wedge_reboot_after_s + 2 * svc.cfg.wedge_reboot_retry_s + 400)
+    assert svc.reboot.calls == 3
+
+
+def test_a_short_outage_does_not_reboot():
+    """A camera that a reset brings back never gets near the reboot."""
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=1)
+    svc.reboot = FakeReboot()
+    svc.run_due(until_mono=3 * svc.cfg.wedge_reboot_after_s)
+    assert svc.reboot.calls == 0 and svc.fail_since_mono is None
+
+
+def test_failure_clock_restarts_after_recovery():
+    """Two separate 20 min outages are not one 40 min outage."""
+    class Flaky(FakeCamera):
+        def capture(self):
+            if (self.clock.mono() // 1500) % 2 == 0 and self.clock.mono() > 100:
+                raise CaptureFailed("fswebcam timed out after 8 s")
+            return super().capture()
+
+        def reset(self):
+            return True, "reset"
+    svc, clock, store = make()
+    svc.camera = Flaky(clock)
+    svc.reboot = FakeReboot()
+    svc.run_due(until_mono=6 * 1500)
+    assert svc.reboot.calls == 0
+
+
+def test_reboot_disabled_by_default():
+    svc, clock, store = make()
+    svc.camera = WedgedCamera(clock, fix_after=10**6)
+    svc.run_due(until_mono=3 * svc.cfg.wedge_reboot_after_s)
+    assert svc.stats.reboot_requests == 0              # no reboot callable given
