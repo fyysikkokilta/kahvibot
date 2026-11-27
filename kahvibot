@@ -253,7 +253,8 @@ def _service_reading(hdr: dict) -> dict:
             "reason": None if usable else "diffuse surface estimate (occluded or no visible surface)",
         })
     return {"pots": pots, "src": "service", "seq": hdr.get("seq"),
-            "age": hdr.get("age"), "reused": hdr.get("reused")}
+            "age": hdr.get("age"), "reused": hdr.get("reused"),
+            "dark": bool(hdr.get("dark"))}
 
 
 def _service_frame():
@@ -405,6 +406,13 @@ def take_picture() -> "tuple[Image, Optional[dict], bytes]":
     return img, None, raw
 
 
+# Say only what the camera can see. The old text ("so nobody is there yet")
+# guessed at people from one dark frame, which was wrong after hours (it went
+# out at 21:06, 22:39 and 03:33 in 2026-11) and is not the bot's call to make.
+DARK_ROOM_TEXT = ("🌙 Kiltiksellä on valot pois, joten pannuja ei näe kuvasta. / "
+                  "The guild room lights are off, so the pots aren't visible.")
+
+
 def send_webcam_photo(update: Update, ctx: CallbackContext):
     bot = ctx.bot
 
@@ -447,7 +455,15 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
     bio.seek(0)
 
     caption = None
-    if caption_text_enabled:
+    # In a dark guild room the photo is black. Say why even with captions
+    # off: a black photo alone reads as a broken bot.
+    dark = bool(reading and reading.get("dark"))
+    if dark:
+        caption = DARK_ROOM_TEXT
+        brews = brew_lines()
+        if brews:
+            caption += "\n" + brews
+    elif caption_text_enabled:
         if coffee_reader_show and reading is not None:
             caption = format_reading(reading) or None
         brews = brew_lines()
@@ -455,7 +471,7 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
             caption = (caption + "\n" + brews) if caption else brews
 
     offer = markup = None
-    if survey and update.effective_user:
+    if survey and update.effective_user and not dark:
         offer = survey.maybe_offer(update.effective_user.id, reading)
         # reading_shown gates the "is this reading wrong?" prompt, which makes no
         # sense when no reading is on screen; the randomly offered help button
