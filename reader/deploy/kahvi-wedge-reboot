@@ -1,0 +1,47 @@
+#!/bin/sh
+# Reboot the Pi because the webcam is wedged. kahvi-reader runs this (through
+# sudo, see install_reader.sh) after captures have failed for 30 min and a USB
+# reset (kahvi-camreset) has not brought the camera back.
+#
+# Why: an under-voltage URB drop can leave the webcam unrecoverable short of a
+# reboot. On 2026-11-21 it stayed dead for 31 h through 134 USB resets, and on
+# 2026-11-25 a service restart did not help either; both times only a reboot did.
+#
+# The rate limit lives here, root-owned, not in the service: at most one wedge
+# reboot per 6 h, so a camera that is unplugged or broken costs at most four
+# short bot outages a day instead of a reboot loop.
+#
+#   kahvi-wedge-reboot            # reboot, unless the last one was < 6 h ago
+#   kahvi-wedge-reboot --dry-run  # only say whether it would
+set -eu
+
+STAMP=/var/lib/kahvi-reader/last-wedge-reboot
+MIN_GAP=21600
+
+dry=0
+[ "${1:-}" = "--dry-run" ] && dry=1
+
+now=$(date +%s)
+last=0
+if [ -f "$STAMP" ]; then
+    last=$(cat "$STAMP" 2>/dev/null || echo 0)
+    case "$last" in ''|*[!0-9]*) last=0 ;; esac
+fi
+gap=$((now - last))
+if [ "$gap" -lt "$MIN_GAP" ]; then
+    echo "refused: the last wedge reboot was $((gap / 60)) min ago (limit $((MIN_GAP / 3600)) h)" >&2
+    exit 2
+fi
+
+if [ $dry = 1 ]; then
+    echo "would reboot"
+    exit 0
+fi
+
+mkdir -p "$(dirname "$STAMP")"
+echo "$now" > "$STAMP"
+logger -t kahvi-wedge-reboot "rebooting: the webcam is wedged and a USB reset did not help"
+echo "rebooting"
+# --no-block: return at once, so the caller can log the answer before systemd
+# stops it with SIGTERM (which flushes its readings).
+systemctl --no-block reboot

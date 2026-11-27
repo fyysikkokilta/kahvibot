@@ -416,7 +416,16 @@ def send_webcam_photo(update: Update, ctx: CallbackContext):
         return
     msg.reply_chat_action(action=CHATACTION_UPLOAD_PHOTO)
 
-    img, reading, raw = take_picture()
+    # A wedged webcam leaves fswebcam writing an empty file (it exits 0 on
+    # error), and Image.open raises. Before this the user got silence and the
+    # journal a traceback (120 of them on 2026-10-27..30).
+    try:
+        img, reading, raw = take_picture()
+    except (OSError, subprocess.CalledProcessError):
+        logger.warning("no photo: the camera gave nothing", exc_info=True)
+        msg.reply_text("📷 Kamera ei nyt vastaa, kokeile hetken päästä uudelleen. / "
+                       "The camera isn't responding right now, try again in a bit.")
+        return
 
     if bot.watermark is not None:
         # Use the watermark image as the mask as well, so it's alpha channel is
